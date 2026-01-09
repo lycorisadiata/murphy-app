@@ -59,8 +59,8 @@ func (i *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 	info, exists := i.limiters[ip]
 	if !exists {
 		// 创建新的限流器
-		// rate.Every(time.Minute) / rate.Limit(requestsPerMinute) 表示每分钟允许的请求数
-		limiter := rate.NewLimiter(rate.Every(time.Minute)/rate.Limit(i.requestsPerMinute), i.burst)
+		// rate.Every(time.Minute / time.Duration(i.requestsPerMinute)) 表示每分钟允许 i.requestsPerMinute 个请求
+		limiter := rate.NewLimiter(rate.Every(time.Minute/time.Duration(i.requestsPerMinute)), i.burst)
 		info = &limiterInfo{
 			limiter:      limiter,
 			lastAccessed: time.Now(),

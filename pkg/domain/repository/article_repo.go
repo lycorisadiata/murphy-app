@@ -78,4 +78,12 @@ type ArticleRepository interface {
 
 	// CountByCategoryWithMultipleCategories 计算有多少文章既属于目标分类，又同时属于其他分类。
 	CountByCategoryWithMultipleCategories(ctx context.Context, categoryID uint) (int, error)
+
+	// FindScheduledArticlesToPublish 查找所有定时发布时间已到的文章
+	// 返回状态为 SCHEDULED 且 scheduled_at <= now 的文章列表
+	FindScheduledArticlesToPublish(ctx context.Context, now time.Time) ([]*model.Article, error)
+
+	// PublishScheduledArticle 发布一篇定时文章
+	// 将文章状态从 SCHEDULED 改为 PUBLISHED，并更新 created_at 为 scheduled_at
+	PublishScheduledArticle(ctx context.Context, articleID uint) error
 }

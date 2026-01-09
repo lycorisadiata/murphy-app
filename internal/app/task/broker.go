@@ -172,6 +172,15 @@ func (b *Broker) RegisterCronJobs() {
 	}
 	b.logger.Info("-> Successfully registered 'LinkHealthCheckJob'", "schedule", "every day at 3:00:00 AM")
 
+	// 添加定时发布文章任务 - 每分钟检查一次
+	scheduledPublishJob := NewScheduledPublishJob(b.articleRepo, b.cacheSvc, b.logger)
+	_, err = b.cron.AddJob("0 * * * * *", scheduledPublishJob) // 每分钟的第0秒执行
+	if err != nil {
+		b.logger.Error("Failed to add 'ScheduledPublishJob'", slog.Any("error", err))
+		os.Exit(1)
+	}
+	b.logger.Info("-> Successfully registered 'ScheduledPublishJob'", "schedule", "every minute")
+
 	b.logger.Info("All periodic jobs registered.")
 }
 
@@ -261,11 +270,11 @@ func (b *Broker) CheckAndRunMissedAggregation() {
 			startDate = lastDate.AddDate(0, 0, 1)
 		}
 
-		// 3. 循环追补数据直到昨天
-		today := time.Now()
-		// 将日期标准化到当天的零点，以进行精确比较
-		today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
-		startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, startDate.Location())
+		// 3. 循环追补数据直到昨天（使用 UTC 时区确保与查询时一致）
+		nowUTC := time.Now().UTC()
+		today := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC)
+		// 将 startDate 也转换为 UTC 时区
+		startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
 
 		// 如果起始日期不在今天之前，说明数据已经是最新的，无需追补
 		if !startDate.Before(today) {

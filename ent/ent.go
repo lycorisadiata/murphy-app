@@ -31,6 +31,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/posttag"
 	"github.com/anzhiyu-c/anheyu-app/ent/setting"
 	"github.com/anzhiyu-c/anheyu-app/ent/storagepolicy"
+	"github.com/anzhiyu-c/anheyu-app/ent/subscriber"
 	"github.com/anzhiyu-c/anheyu-app/ent/tag"
 	"github.com/anzhiyu-c/anheyu-app/ent/urlstat"
 	"github.com/anzhiyu-c/anheyu-app/ent/user"
@@ -118,6 +119,7 @@ func checkColumn(t, c string) error {
 			posttag.Table:                posttag.ValidColumn,
 			setting.Table:                setting.ValidColumn,
 			storagepolicy.Table:          storagepolicy.ValidColumn,
+			subscriber.Table:             subscriber.ValidColumn,
 			tag.Table:                    tag.ValidColumn,
 			urlstat.Table:                urlstat.ValidColumn,
 			user.Table:                   user.ValidColumn,

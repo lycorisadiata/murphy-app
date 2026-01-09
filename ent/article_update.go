@@ -516,6 +516,26 @@ func (_u *ArticleUpdate) ClearKeywords() *ArticleUpdate {
 	return _u
 }
 
+// SetScheduledAt sets the "scheduled_at" field.
+func (_u *ArticleUpdate) SetScheduledAt(v time.Time) *ArticleUpdate {
+	_u.mutation.SetScheduledAt(v)
+	return _u
+}
+
+// SetNillableScheduledAt sets the "scheduled_at" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableScheduledAt(v *time.Time) *ArticleUpdate {
+	if v != nil {
+		_u.SetScheduledAt(*v)
+	}
+	return _u
+}
+
+// ClearScheduledAt clears the value of the "scheduled_at" field.
+func (_u *ArticleUpdate) ClearScheduledAt() *ArticleUpdate {
+	_u.mutation.ClearScheduledAt()
+	return _u
+}
+
 // SetReviewStatus sets the "review_status" field.
 func (_u *ArticleUpdate) SetReviewStatus(v article.ReviewStatus) *ArticleUpdate {
 	_u.mutation.SetReviewStatus(v)
@@ -687,6 +707,20 @@ func (_u *ArticleUpdate) SetExtraConfig(v map[string]interface{}) *ArticleUpdate
 // ClearExtraConfig clears the value of the "extra_config" field.
 func (_u *ArticleUpdate) ClearExtraConfig() *ArticleUpdate {
 	_u.mutation.ClearExtraConfig()
+	return _u
+}
+
+// SetExcludeFromMembership sets the "exclude_from_membership" field.
+func (_u *ArticleUpdate) SetExcludeFromMembership(v bool) *ArticleUpdate {
+	_u.mutation.SetExcludeFromMembership(v)
+	return _u
+}
+
+// SetNillableExcludeFromMembership sets the "exclude_from_membership" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableExcludeFromMembership(v *bool) *ArticleUpdate {
+	if v != nil {
+		_u.SetExcludeFromMembership(*v)
+	}
 	return _u
 }
 
@@ -1104,6 +1138,12 @@ func (_u *ArticleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.KeywordsCleared() {
 		_spec.ClearField(article.FieldKeywords, field.TypeString)
 	}
+	if value, ok := _u.mutation.ScheduledAt(); ok {
+		_spec.SetField(article.FieldScheduledAt, field.TypeTime, value)
+	}
+	if _u.mutation.ScheduledAtCleared() {
+		_spec.ClearField(article.FieldScheduledAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.ReviewStatus(); ok {
 		_spec.SetField(article.FieldReviewStatus, field.TypeEnum, value)
 	}
@@ -1157,6 +1197,9 @@ func (_u *ArticleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ExtraConfigCleared() {
 		_spec.ClearField(article.FieldExtraConfig, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ExcludeFromMembership(); ok {
+		_spec.SetField(article.FieldExcludeFromMembership, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.IsDoc(); ok {
 		_spec.SetField(article.FieldIsDoc, field.TypeBool, value)
@@ -1835,6 +1878,26 @@ func (_u *ArticleUpdateOne) ClearKeywords() *ArticleUpdateOne {
 	return _u
 }
 
+// SetScheduledAt sets the "scheduled_at" field.
+func (_u *ArticleUpdateOne) SetScheduledAt(v time.Time) *ArticleUpdateOne {
+	_u.mutation.SetScheduledAt(v)
+	return _u
+}
+
+// SetNillableScheduledAt sets the "scheduled_at" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableScheduledAt(v *time.Time) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetScheduledAt(*v)
+	}
+	return _u
+}
+
+// ClearScheduledAt clears the value of the "scheduled_at" field.
+func (_u *ArticleUpdateOne) ClearScheduledAt() *ArticleUpdateOne {
+	_u.mutation.ClearScheduledAt()
+	return _u
+}
+
 // SetReviewStatus sets the "review_status" field.
 func (_u *ArticleUpdateOne) SetReviewStatus(v article.ReviewStatus) *ArticleUpdateOne {
 	_u.mutation.SetReviewStatus(v)
@@ -2006,6 +2069,20 @@ func (_u *ArticleUpdateOne) SetExtraConfig(v map[string]interface{}) *ArticleUpd
 // ClearExtraConfig clears the value of the "extra_config" field.
 func (_u *ArticleUpdateOne) ClearExtraConfig() *ArticleUpdateOne {
 	_u.mutation.ClearExtraConfig()
+	return _u
+}
+
+// SetExcludeFromMembership sets the "exclude_from_membership" field.
+func (_u *ArticleUpdateOne) SetExcludeFromMembership(v bool) *ArticleUpdateOne {
+	_u.mutation.SetExcludeFromMembership(v)
+	return _u
+}
+
+// SetNillableExcludeFromMembership sets the "exclude_from_membership" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableExcludeFromMembership(v *bool) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetExcludeFromMembership(*v)
+	}
 	return _u
 }
 
@@ -2453,6 +2530,12 @@ func (_u *ArticleUpdateOne) sqlSave(ctx context.Context) (_node *Article, err er
 	if _u.mutation.KeywordsCleared() {
 		_spec.ClearField(article.FieldKeywords, field.TypeString)
 	}
+	if value, ok := _u.mutation.ScheduledAt(); ok {
+		_spec.SetField(article.FieldScheduledAt, field.TypeTime, value)
+	}
+	if _u.mutation.ScheduledAtCleared() {
+		_spec.ClearField(article.FieldScheduledAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.ReviewStatus(); ok {
 		_spec.SetField(article.FieldReviewStatus, field.TypeEnum, value)
 	}
@@ -2506,6 +2589,9 @@ func (_u *ArticleUpdateOne) sqlSave(ctx context.Context) (_node *Article, err er
 	}
 	if _u.mutation.ExtraConfigCleared() {
 		_spec.ClearField(article.FieldExtraConfig, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.ExcludeFromMembership(); ok {
+		_spec.SetField(article.FieldExcludeFromMembership, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.IsDoc(); ok {
 		_spec.SetField(article.FieldIsDoc, field.TypeBool, value)

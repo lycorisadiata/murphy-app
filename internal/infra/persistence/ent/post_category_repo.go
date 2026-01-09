@@ -83,6 +83,7 @@ func (r *postCategoryRepo) toModel(c *ent.PostCategory) *model.PostCategory {
 		Description: c.Description,
 		Count:       c.Count,
 		IsSeries:    c.IsSeries,
+		SortOrder:   c.SortOrder,
 	}
 }
 
@@ -91,6 +92,7 @@ func (r *postCategoryRepo) Create(ctx context.Context, req *model.CreatePostCate
 		SetName(req.Name).
 		SetNillableDescription(&req.Description).
 		SetIsSeries(req.IsSeries).
+		SetSortOrder(req.SortOrder).
 		Save(ctx)
 	if err != nil {
 		return nil, err
@@ -124,6 +126,9 @@ func (r *postCategoryRepo) Update(ctx context.Context, publicID string, req *mod
 	if req.IsSeries != nil {
 		updater.SetIsSeries(*req.IsSeries)
 	}
+	if req.SortOrder != nil {
+		updater.SetSortOrder(*req.SortOrder)
+	}
 	updatedCategory, err := updater.Save(ctx)
 	if err != nil {
 		return nil, err
@@ -142,7 +147,7 @@ func (r *postCategoryRepo) Delete(ctx context.Context, publicID string) error {
 func (r *postCategoryRepo) List(ctx context.Context) ([]*model.PostCategory, error) {
 	entities, err := r.db.PostCategory.Query().
 		Where(postcategory.DeletedAtIsNil()).
-		Order(ent.Desc(postcategory.FieldCreatedAt)).
+		Order(ent.Asc(postcategory.FieldSortOrder), ent.Desc(postcategory.FieldCreatedAt)).
 		All(ctx)
 	if err != nil {
 		return nil, err

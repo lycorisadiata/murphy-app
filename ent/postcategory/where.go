@@ -90,6 +90,11 @@ func IsSeries(v bool) predicate.PostCategory {
 	return predicate.PostCategory(sql.FieldEQ(FieldIsSeries, v))
 }
 
+// SortOrder applies equality check predicate on the "sort_order" field. It's identical to SortOrderEQ.
+func SortOrder(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldEQ(FieldSortOrder, v))
+}
+
 // DeletedAtEQ applies the EQ predicate on the "deleted_at" field.
 func DeletedAtEQ(v time.Time) predicate.PostCategory {
 	return predicate.PostCategory(sql.FieldEQ(FieldDeletedAt, v))
@@ -408,6 +413,46 @@ func IsSeriesEQ(v bool) predicate.PostCategory {
 // IsSeriesNEQ applies the NEQ predicate on the "is_series" field.
 func IsSeriesNEQ(v bool) predicate.PostCategory {
 	return predicate.PostCategory(sql.FieldNEQ(FieldIsSeries, v))
+}
+
+// SortOrderEQ applies the EQ predicate on the "sort_order" field.
+func SortOrderEQ(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldEQ(FieldSortOrder, v))
+}
+
+// SortOrderNEQ applies the NEQ predicate on the "sort_order" field.
+func SortOrderNEQ(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldNEQ(FieldSortOrder, v))
+}
+
+// SortOrderIn applies the In predicate on the "sort_order" field.
+func SortOrderIn(vs ...int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldIn(FieldSortOrder, vs...))
+}
+
+// SortOrderNotIn applies the NotIn predicate on the "sort_order" field.
+func SortOrderNotIn(vs ...int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldNotIn(FieldSortOrder, vs...))
+}
+
+// SortOrderGT applies the GT predicate on the "sort_order" field.
+func SortOrderGT(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldGT(FieldSortOrder, v))
+}
+
+// SortOrderGTE applies the GTE predicate on the "sort_order" field.
+func SortOrderGTE(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldGTE(FieldSortOrder, v))
+}
+
+// SortOrderLT applies the LT predicate on the "sort_order" field.
+func SortOrderLT(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldLT(FieldSortOrder, v))
+}
+
+// SortOrderLTE applies the LTE predicate on the "sort_order" field.
+func SortOrderLTE(v int) predicate.PostCategory {
+	return predicate.PostCategory(sql.FieldLTE(FieldSortOrder, v))
 }
 
 // HasArticles applies the HasEdge predicate on the "articles" edge.

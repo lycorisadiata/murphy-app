@@ -51,6 +51,9 @@ type Article struct {
 	CopyrightURL         string
 	Keywords             string
 
+	// --- 定时发布相关字段 ---
+	ScheduledAt *time.Time // 定时发布时间，当状态为SCHEDULED时有效
+
 	// --- 审核相关字段（多人共创功能） ---
 	ReviewStatus  string     // 审核状态：NONE-无需审核, PENDING-待审核, APPROVED-已通过, REJECTED-已拒绝
 	ReviewComment string     // 审核意见
@@ -80,7 +83,7 @@ type CreateArticleRequest struct {
 	Title                string              `json:"title" binding:"required"`
 	ContentMd            string              `json:"content_md"`
 	CoverURL             string              `json:"cover_url"`
-	Status               string              `json:"status" binding:"omitempty,oneof=DRAFT PUBLISHED ARCHIVED"`
+	Status               string              `json:"status" binding:"omitempty,oneof=DRAFT PUBLISHED ARCHIVED SCHEDULED"`
 	PostTagIDs           []string            `json:"post_tag_ids"`
 	PostCategoryIDs      []string            `json:"post_category_ids"`
 	IPLocation           string              `json:"ip_location,omitempty"`
@@ -103,6 +106,8 @@ type CreateArticleRequest struct {
 	OwnerID              uint                `json:"owner_id,omitempty"`      // 文章作者ID（多人共创功能）
 	ReviewStatus         string              `json:"review_status,omitempty"` // 审核状态（多人共创功能）
 	ExtraConfig          *ArticleExtraConfig `json:"extra_config,omitempty"`  // 文章扩展配置
+	// 定时发布相关字段
+	ScheduledAt *string `json:"scheduled_at,omitempty"` // 定时发布时间 (RFC3339格式)
 	// 文档模式相关字段
 	IsDoc       bool   `json:"is_doc,omitempty"`        // 是否为文档模式
 	DocSeriesID string `json:"doc_series_id,omitempty"` // 文档系列ID (公共ID)
@@ -114,7 +119,7 @@ type UpdateArticleRequest struct {
 	Title                *string             `json:"title"`
 	ContentMd            *string             `json:"content_md"`
 	CoverURL             *string             `json:"cover_url"`
-	Status               *string             `json:"status" binding:"omitempty,oneof=DRAFT PUBLISHED ARCHIVED"`
+	Status               *string             `json:"status" binding:"omitempty,oneof=DRAFT PUBLISHED ARCHIVED SCHEDULED"`
 	PostTagIDs           []string            `json:"post_tag_ids"`
 	PostCategoryIDs      []string            `json:"post_category_ids"`
 	IPLocation           *string             `json:"ip_location"`
@@ -136,6 +141,8 @@ type UpdateArticleRequest struct {
 	Keywords             *string             `json:"keywords"`
 	ReviewStatus         *string             `json:"review_status,omitempty"` // 审核状态（多人共创功能）
 	ExtraConfig          *ArticleExtraConfig `json:"extra_config,omitempty"`  // 文章扩展配置
+	// 定时发布相关字段
+	ScheduledAt *string `json:"scheduled_at,omitempty"` // 定时发布时间 (RFC3339格式)，设为空字符串则取消定时发布
 	// 文档模式相关字段
 	IsDoc       *bool   `json:"is_doc,omitempty"`        // 是否为文档模式
 	DocSeriesID *string `json:"doc_series_id,omitempty"` // 文档系列ID (公共ID)
@@ -172,6 +179,8 @@ type ArticleResponse struct {
 	CopyrightURL         string                  `json:"copyright_url"`
 	Keywords             string                  `json:"keywords"`
 	CommentCount         int                     `json:"comment_count"`
+	// 定时发布相关字段
+	ScheduledAt *time.Time `json:"scheduled_at,omitempty"` // 定时发布时间，当状态为SCHEDULED时有效
 	// 审核状态（多人共创功能）
 	ReviewStatus string `json:"review_status,omitempty"` // 审核状态：NONE-无需审核, PENDING-待审核, APPROVED-已通过, REJECTED-已拒绝
 	// 发布者信息（多人共创功能）
@@ -283,6 +292,8 @@ type CreateArticleParams struct {
 	Keywords             string
 	ReviewStatus         string              // 审核状态（多人共创功能）：NONE-无需审核, PENDING-待审核
 	ExtraConfig          *ArticleExtraConfig // 文章扩展配置
+	// 定时发布相关字段
+	ScheduledAt *time.Time // 定时发布时间
 	// 文档模式相关字段
 	IsDoc       bool  // 是否为文档模式
 	DocSeriesID *uint // 文档系列ID

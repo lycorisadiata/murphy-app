@@ -33,6 +33,10 @@ type EmailService interface {
 	SendLinkApplicationNotification(ctx context.Context, link *model.LinkDTO) error
 	// SendLinkReviewNotification 发送友链审核通知
 	SendLinkReviewNotification(ctx context.Context, link *model.LinkDTO, isApproved bool, rejectReason string) error
+	// SendVerificationEmail 发送验证码邮件
+	SendVerificationEmail(ctx context.Context, toEmail, code string) error
+	// SendArticlePushEmail 发送文章更新推送邮件
+	SendArticlePushEmail(ctx context.Context, toEmail, unsubscribeToken string, article *model.Article) error
 }
 
 // emailService 是 EmailService 接口的实现
@@ -541,6 +545,179 @@ func (s *emailService) SendLinkReviewNotification(ctx context.Context, link *mod
 	return nil
 }
 
+// SendVerificationEmail 发送验证码邮件
+func (s *emailService) SendVerificationEmail(ctx context.Context, toEmail, code string) error {
+	appName := s.settingSvc.Get(constant.KeyAppName.String())
+	siteURL := s.settingSvc.Get(constant.KeySiteURL.String())
+
+	// 🔧 处理 siteURL，确保有效
+	if siteURL == "" || siteURL == "https://" || siteURL == "http://" {
+		log.Printf("[WARNING] 站点URL未正确配置（当前值: %s），使用默认值 https://anheyu.com", siteURL)
+		siteURL = "https://anheyu.com"
+	}
+	siteURL = strings.TrimRight(siteURL, "/")
+
+	subject := fmt.Sprintf("【%s】订阅验证码： %s", appName, code)
+	body := fmt.Sprintf(`<div style="background-color:#f4f5f7;padding:30px 0;">
+	<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+		<div style="background:linear-gradient(135deg,#667eea 0%%,#764ba2 100%%);padding:30px;text-align:center;">
+			<h1 style="color:#fff;margin:0;font-size:24px;">订阅验证</h1>
+		</div>
+		<div style="padding:30px;">
+			<p style="font-size:16px;line-height:1.8;color:#333;">您好！</p>
+			<p style="font-size:14px;line-height:1.8;color:#666;">感谢您订阅 <strong><a href="%s" style="color:#667eea;text-decoration:none;">%s</a></strong> 的文章更新。</p>
+			<p style="font-size:14px;line-height:1.8;color:#666;">您的验证码是：</p>
+			<div style="background:#f8f9fa;padding:15px;text-align:center;border-radius:6px;margin:20px 0;font-size:24px;font-weight:bold;letter-spacing:4px;color:#333;">
+				%s
+			</div>
+			<p style="font-size:14px;line-height:1.8;color:#000;">该验证码在 5 分钟内有效。</p>
+			<p style="font-size:14px;line-height:1.8;color:#666;">如果您没有进行此操作，请忽略此邮件。</p>
+		</div>
+		<div style="background:#f8f9fa;padding:20px;text-align:center;color:#999;font-size:12px;">
+			<p style="margin:5px 0;">本邮件由系统自动发送，请勿直接回复</p>
+			<p style="margin:5px 0;">© %s</p>
+		</div>
+	</div>
+</div>`, siteURL, appName, code, appName)
+
+	// 创建30秒超时的context
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// 在独立goroutine中发送邮件，使用channel接收结果
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- s.send(toEmail, subject, body)
+	}()
+
+	// 等待发送完成或超时
+	select {
+	case err := <-errChan:
+		if err != nil {
+			log.Printf("[ERROR] 发送订阅验证码邮件失败: %v", err)
+			return fmt.Errorf("发送验证码邮件失败: %w", err)
+		}
+		log.Printf("[INFO] 订阅验证码邮件已发送到: %s", toEmail)
+		return nil
+	case <-ctx.Done():
+		log.Printf("[ERROR] 发送订阅验证码邮件超时 (30s): %s", toEmail)
+		return fmt.Errorf("发送验证码邮件超时，请稍后重试")
+	}
+}
+
+// SendArticlePushEmail 发送文章更新推送邮件
+func (s *emailService) SendArticlePushEmail(ctx context.Context, toEmail, unsubscribeToken string, article *model.Article) error {
+	appName := s.settingSvc.Get(constant.KeyAppName.String())
+	siteURL := s.settingSvc.Get(constant.KeySiteURL.String())
+
+	// 🔧 处理 siteURL，确保有效
+	if siteURL == "" || siteURL == "https://" || siteURL == "http://" {
+		log.Printf("[WARNING] 站点URL未正确配置（当前值: %s），使用默认值 https://anheyu.com", siteURL)
+		siteURL = "https://anheyu.com"
+	}
+	siteURL = strings.TrimRight(siteURL, "/")
+
+	// 构建文章链接
+	articleID := article.ID
+	if article.Abbrlink != "" {
+		articleID = article.Abbrlink
+	}
+	articleURL := fmt.Sprintf("%s/post/%s.html", siteURL, articleID)
+
+	// 构建退订链接
+	unsubscribeURL := fmt.Sprintf("%s/api/public/unsubscribe/%s", siteURL, unsubscribeToken)
+
+	// 准备模板数据
+	subjectTpl := s.settingSvc.Get(constant.KeyPostSubscribeMailSubject.String())
+	if subjectTpl == "" {
+		subjectTpl = "【{{.SITE_NAME}}】新文章发布：{{.TITLE}}"
+	}
+
+	bodyTpl := s.settingSvc.Get(constant.KeyPostSubscribeMailTemplate.String())
+	if bodyTpl == "" {
+		// 默认模板
+		bodyTpl = `<div style="background-color:#f4f5f7;padding:30px 0;">
+    <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <div style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:30px;text-align:center;">
+             <h1 style="color:#fff;margin:0;font-size:24px;">新文章发布通知</h1>
+        </div>
+        <div style="padding:30px;">
+            <p style="font-size:16px;line-height:1.8;color:#333;">你好！</p>
+            <p style="font-size:14px;line-height:1.8;color:#666;"><strong>{{.SITE_NAME}}</strong> 发布了一篇新文章，快来看看吧：</p>
+            
+            <div style="margin:20px 0;border:1px solid #eee;border-radius:8px;overflow:hidden;">
+                {{if .COVER}}
+                <img src="{{.COVER}}" style="width:100%;height:auto;display:block;" alt="{{.TITLE}}">
+                {{end}}
+                <div style="padding:15px;">
+                    <h2 style="font-size:18px;margin:0 0 10px;color:#333;">
+                        <a href="{{.URL}}" style="text-decoration:none;color:#333;">{{.TITLE}}</a>
+                    </h2>
+                    {{if .SUMMARY}}
+                    <p style="font-size:14px;color:#666;line-height:1.6;margin:0;">{{.SUMMARY}}</p>
+                    {{end}}
+                    <div style="margin-top:15px;text-align:right;">
+                         <a href="{{.URL}}" style="display:inline-block;padding:8px 20px;background:#667eea;color:#fff;text-decoration:none;border-radius:4px;font-size:14px;">阅读全文</a>
+                    </div>
+                </div>
+            </div>
+
+            <p style="font-size:12px;color:#999;text-align:center;margin-top:30px;border-top:1px solid #eee;padding-top:20px;">
+                如果您不想再收到此类邮件，可以 <a href="{{.UNSUBSCRIBE_URL}}" style="color:#999;text-decoration:underline;">点击这里退订</a>
+            </p>
+        </div>
+        <div style="background:#f8f9fa;padding:20px;text-align:center;color:#999;font-size:12px;">
+            <p style="margin:5px 0;">© {{.SITE_NAME}}</p>
+        </div>
+    </div>
+</div>`
+	}
+
+	// 获取文章摘要（取第一个）
+	summary := ""
+	if len(article.Summaries) > 0 {
+		summary = article.Summaries[0]
+	} else if len(article.ContentMd) > 0 {
+		// 如果没有摘要，尝试截取正文前100字（简单处理）
+		runes := []rune(article.ContentMd)
+		if len(runes) > 100 {
+			summary = string(runes[:100]) + "..."
+		} else {
+			summary = string(runes)
+		}
+	}
+
+	data := map[string]interface{}{
+		"SITE_NAME":       appName,
+		"SITE_URL":        siteURL,
+		"TITLE":           article.Title,
+		"SUMMARY":         summary,
+		"URL":             articleURL,
+		"COVER":           article.CoverURL,
+		"UNSUBSCRIBE_URL": unsubscribeURL,
+	}
+
+	subject, err := renderTemplate(subjectTpl, data)
+	if err != nil {
+		return fmt.Errorf("渲染文章推送邮件主题失败: %w", err)
+	}
+	body, err := renderTemplate(bodyTpl, data)
+	if err != nil {
+		return fmt.Errorf("渲染文章推送邮件正文失败: %w", err)
+	}
+
+	// 异步发送
+	go func() {
+		if err := s.send(toEmail, subject, body); err != nil {
+			log.Printf("[ERROR] 发送文章推送邮件失败 (Email: %s): %v", toEmail, err)
+		} else {
+			log.Printf("[INFO] 文章推送邮件已发送到: %s", toEmail)
+		}
+	}()
+
+	return nil
+}
+
 // send 是一个底层的、私有的邮件发送函数
 func (s *emailService) send(to, subject, body string) error {
 	host := s.settingSvc.Get(constant.KeySmtpHost.String())
@@ -552,8 +729,8 @@ func (s *emailService) send(to, subject, body string) error {
 	replyToEmail := s.settingSvc.Get(constant.KeySmtpReplyToEmail.String())
 	forceSSL := s.settingSvc.GetBool(constant.KeySmtpForceSSL.String())
 
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
+	// 验证端口配置是否为数字
+	if _, err := strconv.Atoi(portStr); err != nil {
 		msg := fmt.Sprintf("SMTP端口配置无效 '%s'", portStr)
 		log.Printf("错误: %s: %v", msg, err)
 		return fmt.Errorf("%s: %w", msg, err)
@@ -577,7 +754,7 @@ func (s *emailService) send(to, subject, body string) error {
 	message := []byte(messageBuilder.String())
 
 	auth := smtp.PlainAuth("", username, password, host)
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, portStr)
 
 	if forceSSL {
 		if err := sendMailSSL(addr, auth, senderEmail, []string{to}, message); err != nil {
@@ -662,19 +839,22 @@ func renderTemplate(tplStr string, data interface{}) (string, error) {
 
 // sendMailSSL 是用于处理直接SSL连接的辅助函数
 func sendMailSSL(addr string, auth smtp.Auth, from string, to []string, message []byte) error {
-	host := strings.Split(addr, ":")[0]
+	host, port, _ := net.SplitHostPort(addr)
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 		ServerName:         host,
+		MinVersion:         tls.VersionTLS12, // 最低支持TLS 1.2
 	}
 
 	// 设置15秒超时
 	dialer := &net.Dialer{
 		Timeout: 15 * time.Second,
 	}
+
+	log.Printf("[邮件发送] 尝试通过SSL连接到 %s:%s", host, port)
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("TLS拨号失败: %w", err)
+		return fmt.Errorf("TLS拨号失败 (请检查端口是否正确，SSL通常使用465端口): %w", err)
 	}
 	defer conn.Close()
 	client, err := smtp.NewClient(conn, host)

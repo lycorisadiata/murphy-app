@@ -77,27 +77,47 @@ func NewAuthService(
 func (s *authService) createDefaultArticle(ctx context.Context) {
 	log.Println("[INFO] Starting to create default article for new user.")
 
-	// 步骤 1: 读取默认文章的 Markdown 内容
-	mdBytes, err := os.ReadFile("data/DefaultArticle.md")
+	// 获取工作目录
+	wd, err := os.Getwd()
 	if err != nil {
-		log.Printf("[ERROR] Failed to read default article file 'data/DefaultArticle.md': %v", err)
+		log.Printf("[ERROR] Failed to get working directory: %v", err)
+		wd = "." // 降级使用当前目录
+	}
+	log.Printf("[INFO] Current working directory: %s", wd)
+
+	// 步骤 1: 读取默认文章的 Markdown 内容
+	mdPath := filepath.Join(wd, "data", "DefaultArticle.md")
+	mdBytes, err := os.ReadFile(mdPath)
+	if err != nil {
+		log.Printf("[ERROR] Failed to read default article file '%s': %v", mdPath, err)
 		return
 	}
-	content := string(mdBytes)
+	contentMd := string(mdBytes)
+	log.Printf("[INFO] Successfully read Markdown file, length: %d bytes", len(contentMd))
 
-	// 步骤 2: 准备创建文章的请求体
-	// 注意：由于文章服务期望 content_html 字段由上游提供，
-	// 我们将文件内容同时赋给 ContentMd 和 ContentHTML。
-	// article.Service 中的 SanitizeHTML 会处理其中的 HTML 标签。
+	// 步骤 2: 读取预渲染的 HTML 内容
+	// 如果 HTML 文件存在，使用预渲染的 HTML；否则降级为 Markdown 内容
+	var contentHTML string
+	htmlPath := filepath.Join(wd, "data", "DefaultArticle.html")
+	htmlBytes, err := os.ReadFile(htmlPath)
+	if err != nil {
+		log.Printf("[WARN] DefaultArticle.html not found at '%s', falling back to markdown content: %v", htmlPath, err)
+		contentHTML = contentMd // 降级方案：使用 Markdown 内容
+	} else {
+		contentHTML = string(htmlBytes)
+		log.Printf("[INFO] Successfully read HTML file, length: %d bytes. Using pre-rendered HTML for default article.", len(contentHTML))
+	}
+
+	// 步骤 3: 准备创建文章的请求体
 	req := &model.CreateArticleRequest{
 		Title:       "欢迎使用 Anheyu-App！",
-		ContentMd:   content,
-		ContentHTML: content,     // 将原始内容传递给HTML字段以进行净化
+		ContentMd:   contentMd,
+		ContentHTML: contentHTML, // 使用预渲染的 HTML 内容
 		Status:      "PUBLISHED", // 默认发布
 		Summaries:   []string{"这是一篇系统生成的默认文章", "你可以编辑或删除它"},
 	}
 
-	// 步骤 3: 调用文章服务创建文章
+	// 步骤 4: 调用文章服务创建文章
 	// 使用 "system" 作为 IP 地址标识
 	article, err := s.articleSvc.Create(ctx, req, "system")
 	if err != nil {

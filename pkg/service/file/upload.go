@@ -189,6 +189,7 @@ func (s *uploadService) CreateUploadSession(ctx context.Context, ownerID uint, r
 		constant.PolicyTypeTencentCOS: true,
 		constant.PolicyTypeAliOSS:     true,
 		constant.PolicyTypeS3:         true,
+		constant.PolicyTypeQiniu:      true,
 	}
 
 	// --- 客户端直传逻辑 (OneDrive, 腾讯云COS, 阿里云OSS, AWS S3) ---

@@ -56,6 +56,7 @@ import (
 	sitemap_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/sitemap"
 	statistics_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/statistics"
 	storage_policy_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/storage_policy"
+	subscriber_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/subscriber"
 	theme_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/theme"
 	thumbnail_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/thumbnail"
 	user_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/user"
@@ -85,6 +86,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/sitemap"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/statistics"
+	subscriber_service "github.com/anzhiyu-c/anheyu-app/pkg/service/subscriber"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/theme"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/thumbnail"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/user"
@@ -108,6 +110,7 @@ type App struct {
 	storagePolicyService volume.IStoragePolicyService
 	fileService          file_service.FileService
 	mw                   *middleware.Middleware
+	settingRepo          repository.SettingRepository
 	settingSvc           setting.SettingService
 	tokenSvc             auth.TokenService
 	userSvc              user.UserService
@@ -117,6 +120,7 @@ type App struct {
 	eventBus             *event.EventBus
 	postCategorySvc      *post_category_service.Service
 	postTagSvc           *post_tag_service.Service
+	commentSvc           *comment_service.Service
 }
 
 func (a *App) PrintBanner() {
@@ -182,9 +186,6 @@ func NewApp(content embed.FS) (*App, func(), error) {
 			redisClient.Close()
 		}
 	}
-	if err := idgen.InitSqidsEncoder(); err != nil {
-		return nil, tempCleanup, fmt.Errorf("初始化 ID 编码器失败: %w", err)
-	}
 	eventBus := event.NewEventBus()
 	dbType := cfg.GetString(config.KeyDBType)
 	if dbType == "" {
@@ -226,6 +227,17 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		return nil, tempCleanup, fmt.Errorf("数据库初始化失败: %w", err)
 	}
 
+	// --- Phase 4.5: 初始化 ID 编码器 ---
+	// 从数据库获取或生成 IDSeed（存储在数据库中，不可被外部修改）
+	idSeed, err := getOrCreateIDSeed(context.Background(), settingRepo, userRepo)
+	if err != nil {
+		return nil, tempCleanup, fmt.Errorf("获取 IDSeed 失败: %w", err)
+	}
+	if err := idgen.InitSqidsEncoderWithSeed(idSeed); err != nil {
+		return nil, tempCleanup, fmt.Errorf("初始化 ID 编码器失败: %w", err)
+	}
+	log.Println("✅ ID 编码器初始化成功")
+
 	// --- Phase 5: 初始化业务逻辑层 ---
 	txManager := ent_impl.NewEntTransactionManager(entClient, sqlDB, dbType)
 	settingSvc := setting.NewSettingService(settingRepo, eventBus)
@@ -238,6 +250,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	strategyManager.Register(constant.PolicyTypeTencentCOS, strategy.NewTencentCOSStrategy())
 	strategyManager.Register(constant.PolicyTypeAliOSS, strategy.NewAliyunOSSStrategy())
 	strategyManager.Register(constant.PolicyTypeS3, strategy.NewAWSS3Strategy())
+	strategyManager.Register(constant.PolicyTypeQiniu, strategy.NewQiniuKodoStrategy())
 
 	// 使用智能缓存工厂，自动选择 Redis 或内存缓存
 	cacheSvc := utility.NewCacheServiceWithFallback(redisClient)
@@ -257,6 +270,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	storageProviders[constant.PolicyTypeTencentCOS] = storage.NewTencentCOSProvider()
 	storageProviders[constant.PolicyTypeAliOSS] = storage.NewAliOSSProvider()
 	storageProviders[constant.PolicyTypeS3] = storage.NewAWSS3Provider()
+	storageProviders[constant.PolicyTypeQiniu] = storage.NewQiniuKodoProvider()
 	metadataSvc := file_info.NewMetadataService(metadataRepo)
 	postTagSvc := post_tag_service.NewService(postTagRepo)
 	postCategorySvc := post_category_service.NewService(postCategoryRepo, articleRepo)
@@ -359,7 +373,11 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	cdnSvc := cdn.NewService(settingSvc)
 	log.Printf("[DEBUG] CDNService 初始化完成")
 
-	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, userRepo)
+	// 初始化订阅服务和 Handler (需在 ArticleService 之前初始化)
+	subscriberSvc := subscriber_service.NewService(entClient, redisClient, emailSvc)
+	subscriberHandler := subscriber_handler.NewHandler(subscriberSvc)
+
+	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, subscriberSvc, userRepo)
 	log.Printf("[DEBUG] 正在初始化 PushooService...")
 	pushooSvc := utility.NewPushooService(settingSvc)
 	log.Printf("[DEBUG] PushooService 初始化完成")
@@ -450,6 +468,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		notificationHandler,
 		configBackupHandler,
 		configImportExportHandler,
+		subscriberHandler,
 	)
 
 	// --- Phase 8: 配置 Gin 引擎 ---
@@ -485,6 +504,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		storagePolicyService: storagePolicySvc,
 		fileService:          fileSvc,
 		mw:                   mw,
+		settingRepo:          settingRepo,
 		settingSvc:           settingSvc,
 		tokenSvc:             tokenSvc,
 		userSvc:              userSvc,
@@ -494,6 +514,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		eventBus:             eventBus,
 		postCategorySvc:      postCategorySvc,
 		postTagSvc:           postTagSvc,
+		commentSvc:           commentSvc,
 	}
 
 	// 创建cleanup函数
@@ -527,6 +548,10 @@ func (a *App) FileRepository() repository.FileRepository {
 
 func (a *App) EntityRepository() repository.EntityRepository {
 	return a.entityRepo
+}
+
+func (a *App) SettingRepository() repository.SettingRepository {
+	return a.settingRepo
 }
 
 func (a *App) SettingService() setting.SettingService {
@@ -596,6 +621,11 @@ func (a *App) PostTagService() *post_tag_service.Service {
 	return a.postTagSvc
 }
 
+// CommentService 返回评论服务（用于 PRO 版注入站内通知回调）
+func (a *App) CommentService() *comment_service.Service {
+	return a.commentSvc
+}
+
 func (a *App) Run() error {
 	a.taskBroker.RegisterCronJobs()
 	a.taskBroker.CheckAndRunMissedAggregation()
@@ -614,4 +644,61 @@ func (a *App) Stop() {
 		a.taskBroker.Stop()
 		log.Println("任务调度器已停止。")
 	}
+}
+
+// getOrCreateIDSeed 从数据库获取或创建 IDSeed
+// IDSeed 用于生成唯一的公共ID，存储在数据库中以防止被外部修改
+// 重要：对于已有数据的老用户，使用空字符串（默认字母表）保持兼容
+func getOrCreateIDSeed(ctx context.Context, settingRepo repository.SettingRepository, userRepo repository.UserRepository) (string, error) {
+	const idSeedKey = "id_seed"
+
+	// 尝试从数据库获取现有的 IDSeed
+	setting, err := settingRepo.FindByKey(ctx, idSeedKey)
+	if err == nil && setting != nil {
+		// 已存在配置（包括空字符串的情况，表示老用户兼容模式）
+		if setting.Value != "" {
+			log.Println("📦 已从数据库加载 IDSeed")
+		} else {
+			log.Println("📦 使用兼容模式（默认字母表）")
+		}
+		return setting.Value, nil
+	}
+
+	// id_seed 不存在，需要判断是全新安装还是老用户升级
+	// 通过检查用户表是否有数据来判断（有用户 = 老用户升级，无用户 = 全新安装）
+	userCount, err := userRepo.Count(ctx)
+	if err != nil {
+		log.Printf("警告: 无法查询用户数量: %v，假设为老用户升级", err)
+		userCount = 1 // 保守处理，假设有用户
+	}
+
+	var newSeed string
+	var comment string
+
+	if userCount > 0 {
+		// 已有用户数据，说明是老用户升级，使用空字符串保持兼容
+		newSeed = ""
+		comment = "兼容模式：老用户升级，使用默认字母表"
+		log.Println("⚠️  检测到老用户升级，使用兼容模式（默认字母表）以保持已有ID正常解码")
+	} else {
+		// 用户表为空，说明是全新安装，生成新的随机种子
+		newSeed, err = idgen.GenerateRandomSeed()
+		if err != nil {
+			return "", fmt.Errorf("生成随机 IDSeed 失败: %w", err)
+		}
+		comment = "系统自动生成的ID种子，用于生成唯一的公共ID，请勿修改"
+		log.Println("✅ 全新安装，已生成随机 IDSeed")
+	}
+
+	// 保存到数据库（无论是空字符串还是新种子，都要保存，避免重复判断）
+	newSetting := &model.Setting{
+		ConfigKey: idSeedKey,
+		Value:     newSeed,
+		Comment:   comment,
+	}
+	if err := settingRepo.Save(ctx, newSetting); err != nil {
+		return "", fmt.Errorf("保存 IDSeed 到数据库失败: %w", err)
+	}
+
+	return newSeed, nil
 }

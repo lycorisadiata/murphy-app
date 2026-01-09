@@ -585,6 +585,59 @@ func (h *Handler) ExportArticles(c *gin.Context) {
 	c.Data(http.StatusOK, "application/zip", zipData)
 }
 
+// BatchDelete 批量删除文章
+// @Summary      批量删除文章
+// @Description  根据文章ID列表批量删除文章 (软删除)
+// @Tags         文章管理
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body object{ids=[]string} true "要删除的文章ID列表"
+// @Success      200 {object} response.Response{data=object{success_count=int,failed_count=int,failed_ids=[]string}} "删除结果"
+// @Failure      400 {object} response.Response "请求参数错误"
+// @Failure      401 {object} response.Response "未授权"
+// @Failure      500 {object} response.Response "服务器内部错误"
+// @Router       /articles/batch [delete]
+func (h *Handler) BatchDelete(c *gin.Context) {
+	log.Printf("[Handler.BatchDelete] 开始处理批量删除文章请求")
+
+	// 1. 验证用户登录状态
+	_, err := getClaims(c)
+	if err != nil {
+		log.Printf("[Handler.BatchDelete] 认证失败: %v", err)
+		response.Fail(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	// 2. 解析请求参数
+	var req struct {
+		IDs []string `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[Handler.BatchDelete] 参数解析失败: %v", err)
+		response.Fail(c, http.StatusBadRequest, "请求参数无效: "+err.Error())
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		response.Fail(c, http.StatusBadRequest, "文章ID列表不能为空")
+		return
+	}
+
+	log.Printf("[Handler.BatchDelete] 准备删除 %d 篇文章", len(req.IDs))
+
+	// 3. 调用Service层批量删除文章
+	result, err := h.svc.BatchDelete(c.Request.Context(), req.IDs)
+	if err != nil {
+		log.Printf("[Handler.BatchDelete] 批量删除失败: %v", err)
+		response.Fail(c, http.StatusInternalServerError, "批量删除文章失败: "+err.Error())
+		return
+	}
+
+	log.Printf("[Handler.BatchDelete] 批量删除完成 - 成功: %d, 失败: %d", result.SuccessCount, result.FailedCount)
+	response.Success(c, result, "批量删除完成")
+}
+
 // ImportArticles 处理文章导入请求
 // @Summary      导入文章
 // @Description  从上传的 JSON 或 ZIP 文件导入文章

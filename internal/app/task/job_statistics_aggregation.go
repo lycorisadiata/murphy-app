@@ -36,8 +36,9 @@ func (j *StatisticsAggregationJob) Run() {
 
 	j.logger.Info("开始执行统计数据聚合任务")
 
-	// 聚合昨天的数据
-	yesterday := time.Now().AddDate(0, 0, -1)
+	// 聚合昨天的数据（使用 UTC 时区确保与查询时一致）
+	nowUTC := time.Now().UTC()
+	yesterday := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)
 	if err := j.statService.AggregateDaily(ctx, yesterday); err != nil {
 		j.logger.Error("聚合昨日统计数据失败", slog.Any("error", err), slog.Time("date", yesterday))
 		return

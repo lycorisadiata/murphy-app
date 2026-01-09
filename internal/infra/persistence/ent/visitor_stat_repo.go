@@ -51,8 +51,8 @@ func (r *entVisitorStatRepository) GetByDate(ctx context.Context, date time.Time
 }
 
 func (r *entVisitorStatRepository) CreateOrUpdate(ctx context.Context, stat *ent.VisitorStat) error {
-	// 截取到日期，忽略时分秒
-	dateOnly := time.Date(stat.Date.Year(), stat.Date.Month(), stat.Date.Day(), 0, 0, 0, 0, stat.Date.Location())
+	// 截取到日期，忽略时分秒，统一使用 UTC 时区存储以确保与查询一致
+	dateOnly := time.Date(stat.Date.Year(), stat.Date.Month(), stat.Date.Day(), 0, 0, 0, 0, time.UTC)
 
 	return r.client.VisitorStat.Create().
 		SetDate(dateOnly).

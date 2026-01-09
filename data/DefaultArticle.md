@@ -215,7 +215,10 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 **可选参数**：
 
-- `icon`: 图标类名（默认：anzhiyu-icon-circle-arrow-right）
+- `icon`: 图标（可选，默认：`anzhiyu-icon-circle-arrow-right`），支持三种格式：
+  - **AnZhiYu 图标**：如 `anzhiyu-icon-github`、`anzhiyu-icon-circle-arrow-right`。查看所有可用图标：[AnZhiYu 图标库](https://www.iconfont.cn/collections/detail?cid=44481)
+  - **Iconify 图标**：如 `simple-icons:github`、`mdi:arrow-right-circle`（格式为 `prefix:name`）。查看所有可用图标：[Iconify 图标库](https://icon-sets.iconify.design/)
+  - **图片链接**：支持 http:// 或 https:// 开头的图片 URL
 - `color`: 颜色主题
   - default（默认主题色）
   - blue（蓝色）
@@ -310,7 +313,7 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 <!-- 自定义图标 -->
 
-{btn url=https://github.com text=GitHub icon=anzhiyu-icon-github color=blue}{/btn}
+{btn url=https://github.com text=GitHub icon=simple-icons:github color=blue}{/btn}
 
 <!-- 多按钮并排 -->
 
@@ -363,10 +366,12 @@ note、abstract、info、tip、success、question、warning、failure、danger�
    - 移动端考虑使用 larger 增加点击区域
 
 4. **图标规范**
-   - 外链使用 anzhiyu-icon-external-link
-   - 下载使用 anzhiyu-icon-download
-   - GitHub 使用 anzhiyu-icon-github
-   - 默认箭头 anzhiyu-icon-circle-arrow-right
+   - 支持 **AnZhiYu 图标库**（[查看图标](https://www.iconfont.cn/collections/detail?cid=44481)）和 **Iconify 图标库**（[查看图标](https://icon-sets.iconify.design/)）
+   - 常用图标示例：
+     - 外链：`mdi:open-in-new` 或 `anzhiyu-icon-external-link`
+     - 下载：`mdi:download` 或 `anzhiyu-icon-download`
+     - GitHub：`simple-icons:github` 或 `anzhiyu-icon-github`
+     - 默认箭头：`mdi:arrow-right-circle` 或 `anzhiyu-icon-circle-arrow-right`
 
 :::
 
@@ -404,9 +409,9 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 **按钮参数**：
 
 - `icon`: 图标（必填），支持三种格式：
-  - AnZhiYu 图标：如 `anzhiyu-icon-user-3-fill`
-  - Iconify 图标：如 `ri:github-fill`、`mdi:home`（格式为 `prefix:name`）
-  - 图片链接：支持 http:// 或 https:// 开头的图片 URL
+  - **AnZhiYu 图标**：使用 AnZhiYu 图标字体类名，如 `anzhiyu-icon-github`、`anzhiyu-icon-user-3-fill`。查看所有可用图标：[AnZhiYu 图标库](https://www.iconfont.cn/collections/detail?cid=44481)
+  - **Iconify 图标**：使用 Iconify 格式 `prefix:name`，如 `simple-icons:github`、`ri:user-3-fill`、`simple-icons:bilibili`。查看所有可用图标：[Iconify 图标库](https://icon-sets.iconify.design/)
+  - **图片链接**：支持 http:// 或 https:// 开头的图片 URL
 - `title`: 按钮标题（必填）
 - `url`: 链接地址，默认为 `#`
 - `desc`: 描述文字（可选）
@@ -424,12 +429,12 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 :::btns cols=3
 
-- icon=anzhiyu-icon-shapes title=安知鱼 url=https://blog.anheyu.com desc=创始人·全栈开发 color=blue
-- icon=anzhiyu-icon-shapes title=张小明 url=# desc=前端工程师 color=green
-- icon=anzhiyu-icon-shapes title=李小红 url=# desc=UI/UX 设计师 color=pink
-- icon=anzhiyu-icon-shapes title=王小刚 url=# desc=后端工程师 color=purple
-- icon=anzhiyu-icon-shapes title=刘小丽 url=# desc=产品经理 color=orange
-- icon=anzhiyu-icon-shapes title=赵小强 url=# desc=测试工程师 color=red
+- icon=ri:user-3-fill title=安知鱼 url=https://blog.anheyu.com desc=创始人·全栈开发 color=blue
+- icon=ri:user-3-fill title=张小明 url=# desc=前端工程师 color=green
+- icon=ri:user-3-fill title=李小红 url=# desc=UI/UX 设计师 color=pink
+- icon=ri:user-3-fill title=王小刚 url=# desc=后端工程师 color=purple
+- icon=ri:user-3-fill title=刘小丽 url=# desc=产品经理 color=orange
+- icon=ri:user-3-fill title=赵小强 url=# desc=测试工程师 color=red
 
 :::
 
@@ -437,10 +442,10 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 :::btns cols=4
 
-- icon=anzhiyu-icon-link title=安知鱼博客 url=https://blog.anheyu.com desc=技术分享与生活记录
-- icon=anzhiyu-icon-link title=Hexo url=https://hexo.io desc=快速、简洁的博客框架
-- icon=anzhiyu-icon-link title=Vue.js url=https://vuejs.org desc=渐进式 JavaScript 框架
-- icon=anzhiyu-icon-link title=TypeScript url=https://www.typescriptlang.org desc=JavaScript 的超集
+- icon=mdi:link title=安知鱼博客 url=https://blog.anheyu.com desc=技术分享与生活记录
+- icon=mdi:link title=Hexo url=https://hexo.io desc=快速、简洁的博客框架
+- icon=mdi:link title=Vue.js url=https://vuejs.org desc=渐进式 JavaScript 框架
+- icon=mdi:link title=TypeScript url=https://www.typescriptlang.org desc=JavaScript 的超集
 
 :::
 
@@ -448,11 +453,11 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 :::btns cols=5
 
-- icon=anzhiyu-icon-github-fill title=GitHub url=https://github.com color=blue
-- icon=anzhiyu-icon-twitter-fill title=Twitter url=https://twitter.com color=blue
-- icon=anzhiyu-icon-bilibili-fill title=Bilibili url=https://bilibili.com color=pink
-- icon=anzhiyu-icon-wechat-fill title=微信 url=# color=green
-- icon=anzhiyu-icon-qq-fill title=QQ url=# color=blue
+- icon=simple-icons:github title=GitHub url=https://github.com color=blue
+- icon=mdi:twitter title=Twitter url=https://twitter.com color=blue
+- icon=simple-icons:bilibili title=Bilibili url=https://bilibili.com color=pink
+- icon=mdi:wechat title=微信 url=# color=green
+- icon=simple-icons:tencentqq title=QQ url=# color=blue
 
 :::
 
@@ -460,8 +465,8 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 
 :::btns cols=2
 
-- icon=anzhiyu-icon-file-text title=文档 url=# desc=查看完整文档 color=blue
-- icon=anzhiyu-icon-github title=源码 url=# desc=GitHub 仓库 color=purple
+- icon=mdi:file-document-outline title=文档 url=# desc=查看完整文档 color=blue
+- icon=simple-icons:github title=源码 url=# desc=GitHub 仓库 color=purple
 
 :::
 
@@ -474,9 +479,9 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 ```markdown
 :::btns cols=3
 
-- icon=anzhiyu-icon-shapes title=张三 url=https://example.com desc=前端工程师 color=blue
-- icon=anzhiyu-icon-shapes title=李四 url=https://example.com desc=后端工程师 color=green
-- icon=anzhiyu-icon-shapes title=王五 url=https://example.com desc=UI 设计师 color=pink
+- icon=ri:user-3-fill title=张三 url=https://example.com desc=前端工程师 color=blue
+- icon=ri:user-3-fill title=李四 url=https://example.com desc=后端工程师 color=green
+- icon=ri:user-3-fill title=王五 url=https://example.com desc=UI 设计师 color=pink
 
 :::
 ```
@@ -488,10 +493,10 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 ```markdown
 :::btns cols=4
 
-- icon=anzhiyu-icon-code title=项目 A url=# desc=Web 应用开发
-- icon=anzhiyu-icon-mobile title=项目 B url=# desc=移动端应用
-- icon=anzhiyu-icon-server title=项目 C url=# desc=后端服务
-- icon=anzhiyu-icon-database title=项目 D url=# desc=数据库设计
+- icon=mdi:code-tags title=项目 A url=# desc=Web 应用开发
+- icon=mdi:cellphone title=项目 B url=# desc=移动端应用
+- icon=mdi:server title=项目 C url=# desc=后端服务
+- icon=mdi:database title=项目 D url=# desc=数据库设计
 
 :::
 ```
@@ -503,12 +508,12 @@ note、abstract、info、tip、success、question、warning、failure、danger�
 ```markdown
 :::btns cols=6
 
-- icon=anzhiyu-icon-company-1 title=公司 A url=#
-- icon=anzhiyu-icon-company-2 title=公司 B url=#
-- icon=anzhiyu-icon-company-3 title=公司 C url=#
-- icon=anzhiyu-icon-company-4 title=公司 D url=#
-- icon=anzhiyu-icon-company-5 title=公司 E url=#
-- icon=anzhiyu-icon-company-6 title=公司 F url=#
+- icon=ri:building-fill title=公司 A url=#
+- icon=ri:building-fill title=公司 B url=#
+- icon=ri:building-fill title=公司 C url=#
+- icon=ri:building-fill title=公司 D url=#
+- icon=ri:building-fill title=公司 E url=#
+- icon=ri:building-fill title=公司 F url=#
 
 :::
 ```
@@ -539,10 +544,11 @@ icon 支持 https 图片链接，显示为圆形头像：
 
 **2. 图标使用**
 
+- 支持 **AnZhiYu 图标库**（[查看图标](https://www.iconfont.cn/collections/detail?cid=44481)）和 **Iconify 图标库**（[查看图标](https://icon-sets.iconify.design/)）
 - 保持同一组按钮使用相同系列的图标
-- 团队成员建议使用 `anzhiyu-icon-user-*` 系列
-- 社交媒体使用对应的品牌图标
-- 链接使用 `anzhiyu-icon-link` 或 `anzhiyu-icon-external-link`
+- 团队成员建议使用 `ri:user-3-fill`、`mdi:account` 或 `anzhiyu-icon-user-*` 系列
+- 社交媒体使用对应的品牌图标（如 `simple-icons:github`、`simple-icons:bilibili` 或 `anzhiyu-icon-github`）
+- 链接使用 `mdi:link`、`mdi:open-in-new` 或 `anzhiyu-icon-link`、`anzhiyu-icon-external-link`
 
 **3. 颜色搭配**
 
@@ -861,59 +867,6 @@ console.log("Hello World");
 :::
 ```
 
-== tab 最佳实践
-
-**1. 列数选择**
-
-- **1 列**: 适合横幅图、大图展示
-- **2 列**: 适合宽屏图片、视频封面
-- **3 列**: 最常用的布局，适合作品集、相册
-- **4 列**: 适合产品展示、照片墙
-- **5-6 列**: 适合小图标、图标集合
-
-**2. 宽高比使用**
-
-- **不设置**: 图片保持原始比例，适合尺寸不一的图片
-- **1:1**: 正方形，适合头像、LOGO、产品图
-- **16:9**: 宽屏，适合视频封面、横幅
-- **4:3**: 传统照片比例
-- **3:2**: 相机照片常用比例
-
-**3. 间距设置**
-
-- **8-10px**: 紧凑布局，适合照片墙
-- **15-20px**: 标准布局，最常用
-- **25-30px**: 宽松布局，突出单张图片
-
-**4. 响应式设计**
-
-图片组会根据屏幕尺寸自动调整：
-
-- **桌面端（>768px）**: 保持设定的列数
-- **平板端（≤768px）**: 4-6 列自动调整为 3 列
-- **手机端（≤500px）**: 3-6 列自动调整为 2 列，2 列自动调整为 1 列
-
-**5. 交互特性**
-
-- ✅ 悬停效果：图片轻微上浮并放大
-- ✅ 显示标题：鼠标悬停显示图片标题
-- ✅ 点击放大：集成 Fancybox，支持全屏查看
-- ✅ 懒加载：自动启用图片懒加载优化性能
-
-**6. 性能优化**
-
-- 单个图片组建议不超过 20 张
-- 使用适当的图片尺寸（不要过大）
-- 移动端建议使用较少的列数（2-3 列）
-- 图片会自动懒加载，提升首屏性能
-
-**7. 注意事项**
-
-- 确保图片 URL 有效且可访问
-- 使用相同尺寸的图片效果更佳
-- 建议添加有意义的图片标题
-- 测试移动端显示效果
-
 :::
 
 ## LinkCard
@@ -1043,13 +996,6 @@ url=视频地址 title=视频标题 desc=视频描述
 - `title`: 视频标题（可选）
 - `desc`: 视频描述（可选）
 
-### 特性
-
-- ✅ 响应式设计，自动适配移动端
-- ✅ 悬停效果，显示播放按钮
-- ✅ 原生视频控制器，支持全屏播放
-- ✅ 支持多种视频格式（MP4、WebM、OGG 等）
-
 ## 🎵 音乐播放器
 
 音乐播放器插件可以在文章中嵌入美观的网易云音乐播放器，支持播放、暂停、进度控制等功能。
@@ -1076,15 +1022,6 @@ url=视频地址 title=视频标题 desc=视频描述
 {music id=1868553}{/music}
 ```
 
-### 功能特性
-
-- ✅ 自动获取歌曲信息（名称、歌手、封面）
-- ✅ 自动提取封面主色，进度条颜色自适应
-- ✅ 支持播放、暂停、进度控制
-- ✅ 显示播放时间和总时长
-- ✅ 旋转封面动画
-- ✅ 响应式设计，完美适配移动端
-
 ### 如何获取歌曲 ID
 
 1. 打开网易云音乐网页版或客户端
@@ -1092,8 +1029,6 @@ url=视频地址 title=视频标题 desc=视频描述
 3. 复制歌曲链接，ID 就是链接中的数字
 
 例如：`https://music.163.com/#/song?id=554241732`，ID 就是 `554241732`
-
-![文章内音乐组件](https://upload-bbs.miyoushe.com/upload/2025/11/05/125766904/9d759897f65eb5e7d59d54e54806e671_970332254315767898.png)
 
 ## ☘️ 占个坑@！
 

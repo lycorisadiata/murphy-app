@@ -110,6 +110,14 @@ func (s *storagePolicyService) CreatePolicy(ctx context.Context, ownerID uint, p
 			return errors.New("对于AWS S3策略, bucket_name (存储桶名称), access_key (AccessKeyId), 和 secret_key (SecretAccessKey) 是必填项")
 		}
 		// AWS S3的endpoint是可选的，如果不提供则使用默认的AWS S3端点
+	case constant.PolicyTypeQiniu:
+		if policy.BucketName == "" || policy.AccessKey == "" || policy.SecretKey == "" {
+			return errors.New("对于七牛云存储策略, bucket_name (存储空间名称), access_key (AccessKey), 和 secret_key (SecretKey) 是必填项")
+		}
+		// 七牛云需要在settings中配置cdn_domain（访问域名）
+		if cdnDomain, ok := policy.Settings["cdn_domain"].(string); !ok || cdnDomain == "" {
+			return errors.New("对于七牛云存储策略, settings.cdn_domain (访问域名) 是必填项")
+		}
 	}
 
 	// 1c. 委托给策略处理器，验证 settings 内部的字段

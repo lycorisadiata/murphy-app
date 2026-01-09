@@ -63,6 +63,9 @@ type Setting func(*sql.Selector)
 // StoragePolicy is the predicate function for storagepolicy builders.
 type StoragePolicy func(*sql.Selector)
 
+// Subscriber is the predicate function for subscriber builders.
+type Subscriber func(*sql.Selector)
+
 // Tag is the predicate function for tag builders.
 type Tag func(*sql.Selector)
 

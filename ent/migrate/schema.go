@@ -73,7 +73,7 @@ var (
 		{Name: "content_md", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "文章的 Markdown 原文"},
 		{Name: "content_html", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "由 content_md 解析和净化后的 HTML"},
 		{Name: "cover_url", Type: field.TypeString, Nullable: true, Comment: "封面图URL"},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "PUBLISHED", "ARCHIVED"}, Default: "DRAFT"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "PUBLISHED", "ARCHIVED", "SCHEDULED"}, Default: "DRAFT"},
 		{Name: "view_count", Type: field.TypeInt, Comment: "浏览次数", Default: 0},
 		{Name: "word_count", Type: field.TypeInt, Comment: "总字数", Default: 0},
 		{Name: "reading_time", Type: field.TypeInt, Comment: "阅读时长(分钟)", Default: 0},
@@ -91,6 +91,7 @@ var (
 		{Name: "copyright_author_href", Type: field.TypeString, Nullable: true, Comment: "版权作者链接"},
 		{Name: "copyright_url", Type: field.TypeString, Nullable: true, Comment: "版权来源链接"},
 		{Name: "keywords", Type: field.TypeString, Nullable: true, Comment: "文章关键词，用于SEO优化"},
+		{Name: "scheduled_at", Type: field.TypeTime, Nullable: true, Comment: "定时发布时间，当status为SCHEDULED时有效"},
 		{Name: "review_status", Type: field.TypeEnum, Comment: "审核状态：NONE-无需审核, PENDING-待审核, APPROVED-已通过, REJECTED-已拒绝", Enums: []string{"NONE", "PENDING", "APPROVED", "REJECTED"}, Default: "NONE"},
 		{Name: "review_comment", Type: field.TypeString, Nullable: true, Comment: "审核意见"},
 		{Name: "reviewed_at", Type: field.TypeTime, Nullable: true, Comment: "审核时间"},
@@ -100,6 +101,7 @@ var (
 		{Name: "takedown_at", Type: field.TypeTime, Nullable: true, Comment: "下架时间"},
 		{Name: "takedown_by", Type: field.TypeUint, Nullable: true, Comment: "下架操作人ID"},
 		{Name: "extra_config", Type: field.TypeJSON, Nullable: true, Comment: "文章扩展配置（JSON格式，用于存储各种可选功能配置，如 enable_ai_podcast 等）"},
+		{Name: "exclude_from_membership", Type: field.TypeBool, Comment: "是否排除在会员权益外：true表示会员也需要单独购买此文章", Default: false},
 		{Name: "is_doc", Type: field.TypeBool, Comment: "是否为文档模式：文档模式的文章会在文档页面展示", Default: false},
 		{Name: "doc_sort", Type: field.TypeInt, Comment: "文档在系列中的排序，数值越小越靠前", Default: 0},
 		{Name: "doc_series_id", Type: field.TypeUint, Nullable: true, Comment: "文档系列ID，关联到doc_series表"},
@@ -113,7 +115,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "articles_doc_series_articles",
-				Columns:    []*schema.Column{ArticlesColumns[38]},
+				Columns:    []*schema.Column{ArticlesColumns[40]},
 				RefColumns: []*schema.Column{DocSeriesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -500,6 +502,7 @@ var (
 		{Name: "description", Type: field.TypeString, Nullable: true, Comment: "分类描述"},
 		{Name: "count", Type: field.TypeInt, Comment: "该分类下的文章数量", Default: 0},
 		{Name: "is_series", Type: field.TypeBool, Comment: "是否为系列", Default: false},
+		{Name: "sort_order", Type: field.TypeInt, Comment: "分类排序值，数值越小越靠前", Default: 0},
 	}
 	// PostCategoriesTable holds the schema information for the "post_categories" table.
 	PostCategoriesTable = &schema.Table{
@@ -567,6 +570,38 @@ var (
 		Comment:    "存储策略表",
 		Columns:    StoragePoliciesColumns,
 		PrimaryKey: []*schema.Column{StoragePoliciesColumns[0]},
+	}
+	// SubscribersColumns holds the columns for the "subscribers" table.
+	SubscribersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "email", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "token", Type: field.TypeString, Unique: true, Nullable: true, Size: 64},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// SubscribersTable holds the schema information for the "subscribers" table.
+	SubscribersTable = &schema.Table{
+		Name:       "subscribers",
+		Columns:    SubscribersColumns,
+		PrimaryKey: []*schema.Column{SubscribersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "subscriber_email",
+				Unique:  true,
+				Columns: []*schema.Column{SubscribersColumns[1]},
+			},
+			{
+				Name:    "subscriber_token",
+				Unique:  true,
+				Columns: []*schema.Column{SubscribersColumns[3]},
+			},
+			{
+				Name:    "subscriber_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{SubscribersColumns[2]},
+			},
+		},
 	}
 	// TagsColumns holds the columns for the "tags" table.
 	TagsColumns = []*schema.Column{
@@ -947,6 +982,7 @@ var (
 		PostTagsTable,
 		SettingsTable,
 		StoragePoliciesTable,
+		SubscribersTable,
 		TagsTable,
 		URLStatsTable,
 		UsersTable,

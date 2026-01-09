@@ -237,6 +237,18 @@ func (f StoragePolicyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.StoragePolicyMutation", m)
 }
 
+// The SubscriberFunc type is an adapter to allow the use of ordinary
+// function as Subscriber mutator.
+type SubscriberFunc func(context.Context, *ent.SubscriberMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SubscriberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SubscriberMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SubscriberMutation", m)
+}
+
 // The TagFunc type is an adapter to allow the use of ordinary
 // function as Tag mutator.
 type TagFunc func(context.Context, *ent.TagMutation) (ent.Value, error)

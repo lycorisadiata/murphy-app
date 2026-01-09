@@ -175,6 +175,11 @@ func Keywords(v string) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldKeywords, v))
 }
 
+// ScheduledAt applies equality check predicate on the "scheduled_at" field. It's identical to ScheduledAtEQ.
+func ScheduledAt(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldScheduledAt, v))
+}
+
 // ReviewComment applies equality check predicate on the "review_comment" field. It's identical to ReviewCommentEQ.
 func ReviewComment(v string) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldReviewComment, v))
@@ -208,6 +213,11 @@ func TakedownAt(v time.Time) predicate.Article {
 // TakedownBy applies equality check predicate on the "takedown_by" field. It's identical to TakedownByEQ.
 func TakedownBy(v uint) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldTakedownBy, v))
+}
+
+// ExcludeFromMembership applies equality check predicate on the "exclude_from_membership" field. It's identical to ExcludeFromMembershipEQ.
+func ExcludeFromMembership(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldExcludeFromMembership, v))
 }
 
 // IsDoc applies equality check predicate on the "is_doc" field. It's identical to IsDocEQ.
@@ -1545,6 +1555,56 @@ func KeywordsContainsFold(v string) predicate.Article {
 	return predicate.Article(sql.FieldContainsFold(FieldKeywords, v))
 }
 
+// ScheduledAtEQ applies the EQ predicate on the "scheduled_at" field.
+func ScheduledAtEQ(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldScheduledAt, v))
+}
+
+// ScheduledAtNEQ applies the NEQ predicate on the "scheduled_at" field.
+func ScheduledAtNEQ(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldScheduledAt, v))
+}
+
+// ScheduledAtIn applies the In predicate on the "scheduled_at" field.
+func ScheduledAtIn(vs ...time.Time) predicate.Article {
+	return predicate.Article(sql.FieldIn(FieldScheduledAt, vs...))
+}
+
+// ScheduledAtNotIn applies the NotIn predicate on the "scheduled_at" field.
+func ScheduledAtNotIn(vs ...time.Time) predicate.Article {
+	return predicate.Article(sql.FieldNotIn(FieldScheduledAt, vs...))
+}
+
+// ScheduledAtGT applies the GT predicate on the "scheduled_at" field.
+func ScheduledAtGT(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldGT(FieldScheduledAt, v))
+}
+
+// ScheduledAtGTE applies the GTE predicate on the "scheduled_at" field.
+func ScheduledAtGTE(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldGTE(FieldScheduledAt, v))
+}
+
+// ScheduledAtLT applies the LT predicate on the "scheduled_at" field.
+func ScheduledAtLT(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldLT(FieldScheduledAt, v))
+}
+
+// ScheduledAtLTE applies the LTE predicate on the "scheduled_at" field.
+func ScheduledAtLTE(v time.Time) predicate.Article {
+	return predicate.Article(sql.FieldLTE(FieldScheduledAt, v))
+}
+
+// ScheduledAtIsNil applies the IsNil predicate on the "scheduled_at" field.
+func ScheduledAtIsNil() predicate.Article {
+	return predicate.Article(sql.FieldIsNull(FieldScheduledAt))
+}
+
+// ScheduledAtNotNil applies the NotNil predicate on the "scheduled_at" field.
+func ScheduledAtNotNil() predicate.Article {
+	return predicate.Article(sql.FieldNotNull(FieldScheduledAt))
+}
+
 // ReviewStatusEQ applies the EQ predicate on the "review_status" field.
 func ReviewStatusEQ(v ReviewStatus) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldReviewStatus, v))
@@ -1933,6 +1993,16 @@ func ExtraConfigIsNil() predicate.Article {
 // ExtraConfigNotNil applies the NotNil predicate on the "extra_config" field.
 func ExtraConfigNotNil() predicate.Article {
 	return predicate.Article(sql.FieldNotNull(FieldExtraConfig))
+}
+
+// ExcludeFromMembershipEQ applies the EQ predicate on the "exclude_from_membership" field.
+func ExcludeFromMembershipEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldExcludeFromMembership, v))
+}
+
+// ExcludeFromMembershipNEQ applies the NEQ predicate on the "exclude_from_membership" field.
+func ExcludeFromMembershipNEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldExcludeFromMembership, v))
 }
 
 // IsDocEQ applies the EQ predicate on the "is_doc" field.

@@ -107,9 +107,9 @@ func NewService(settingSvc setting.SettingService, bus *event.EventBus) *Service
 	policy.AllowAttrs("aria-label").OnElements("button")
 
 	policy.AllowAttrs("data-tip-id").OnElements("span")
-	policy.AllowAttrs("data-content", "data-position", "data-theme", "data-trigger", "data-delay").OnElements("div")
-	policy.AllowAttrs("role").OnElements("div")
-	policy.AllowAttrs("aria-hidden").OnElements("div")
+	policy.AllowAttrs("data-content", "data-position", "data-theme", "data-trigger", "data-delay", "data-visible").OnElements("div", "span")
+	policy.AllowAttrs("role").OnElements("div", "span")
+	policy.AllowAttrs("aria-hidden").OnElements("div", "span")
 
 	// PRO 版内容保护相关属性
 	// 密码保护内容

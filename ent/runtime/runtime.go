@@ -25,6 +25,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/schema"
 	"github.com/anzhiyu-c/anheyu-app/ent/setting"
 	"github.com/anzhiyu-c/anheyu-app/ent/storagepolicy"
+	"github.com/anzhiyu-c/anheyu-app/ent/subscriber"
 	"github.com/anzhiyu-c/anheyu-app/ent/tag"
 	"github.com/anzhiyu-c/anheyu-app/ent/urlstat"
 	"github.com/anzhiyu-c/anheyu-app/ent/user"
@@ -203,15 +204,19 @@ func init() {
 	// article.DefaultCopyright holds the default value on creation for the copyright field.
 	article.DefaultCopyright = articleDescCopyright.Default.(bool)
 	// articleDescIsTakedown is the schema descriptor for is_takedown field.
-	articleDescIsTakedown := articleFields[30].Descriptor()
+	articleDescIsTakedown := articleFields[31].Descriptor()
 	// article.DefaultIsTakedown holds the default value on creation for the is_takedown field.
 	article.DefaultIsTakedown = articleDescIsTakedown.Default.(bool)
+	// articleDescExcludeFromMembership is the schema descriptor for exclude_from_membership field.
+	articleDescExcludeFromMembership := articleFields[36].Descriptor()
+	// article.DefaultExcludeFromMembership holds the default value on creation for the exclude_from_membership field.
+	article.DefaultExcludeFromMembership = articleDescExcludeFromMembership.Default.(bool)
 	// articleDescIsDoc is the schema descriptor for is_doc field.
-	articleDescIsDoc := articleFields[35].Descriptor()
+	articleDescIsDoc := articleFields[37].Descriptor()
 	// article.DefaultIsDoc holds the default value on creation for the is_doc field.
 	article.DefaultIsDoc = articleDescIsDoc.Default.(bool)
 	// articleDescDocSort is the schema descriptor for doc_sort field.
-	articleDescDocSort := articleFields[37].Descriptor()
+	articleDescDocSort := articleFields[39].Descriptor()
 	// article.DefaultDocSort holds the default value on creation for the doc_sort field.
 	article.DefaultDocSort = articleDescDocSort.Default.(int)
 	// article.DocSortValidator is a validator for the "doc_sort" field. It is called by the builders before save.
@@ -657,6 +662,12 @@ func init() {
 	postcategoryDescIsSeries := postcategoryFields[6].Descriptor()
 	// postcategory.DefaultIsSeries holds the default value on creation for the is_series field.
 	postcategory.DefaultIsSeries = postcategoryDescIsSeries.Default.(bool)
+	// postcategoryDescSortOrder is the schema descriptor for sort_order field.
+	postcategoryDescSortOrder := postcategoryFields[7].Descriptor()
+	// postcategory.DefaultSortOrder holds the default value on creation for the sort_order field.
+	postcategory.DefaultSortOrder = postcategoryDescSortOrder.Default.(int)
+	// postcategory.SortOrderValidator is a validator for the "sort_order" field. It is called by the builders before save.
+	postcategory.SortOrderValidator = postcategoryDescSortOrder.Validators[0].(func(int) error)
 	posttagMixin := schema.PostTag{}.Mixin()
 	posttagMixinHooks0 := posttagMixin[0].Hooks()
 	posttag.Hooks[0] = posttagMixinHooks0[0]
@@ -790,6 +801,44 @@ func init() {
 	storagepolicyDescVirtualPath := storagepolicyFields[13].Descriptor()
 	// storagepolicy.VirtualPathValidator is a validator for the "virtual_path" field. It is called by the builders before save.
 	storagepolicy.VirtualPathValidator = storagepolicyDescVirtualPath.Validators[0].(func(string) error)
+	subscriberFields := schema.Subscriber{}.Fields()
+	_ = subscriberFields
+	// subscriberDescEmail is the schema descriptor for email field.
+	subscriberDescEmail := subscriberFields[0].Descriptor()
+	// subscriber.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	subscriber.EmailValidator = func() func(string) error {
+		validators := subscriberDescEmail.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(email string) error {
+			for _, fn := range fns {
+				if err := fn(email); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// subscriberDescIsActive is the schema descriptor for is_active field.
+	subscriberDescIsActive := subscriberFields[1].Descriptor()
+	// subscriber.DefaultIsActive holds the default value on creation for the is_active field.
+	subscriber.DefaultIsActive = subscriberDescIsActive.Default.(bool)
+	// subscriberDescToken is the schema descriptor for token field.
+	subscriberDescToken := subscriberFields[2].Descriptor()
+	// subscriber.TokenValidator is a validator for the "token" field. It is called by the builders before save.
+	subscriber.TokenValidator = subscriberDescToken.Validators[0].(func(string) error)
+	// subscriberDescCreatedAt is the schema descriptor for created_at field.
+	subscriberDescCreatedAt := subscriberFields[3].Descriptor()
+	// subscriber.DefaultCreatedAt holds the default value on creation for the created_at field.
+	subscriber.DefaultCreatedAt = subscriberDescCreatedAt.Default.(func() time.Time)
+	// subscriberDescUpdatedAt is the schema descriptor for updated_at field.
+	subscriberDescUpdatedAt := subscriberFields[4].Descriptor()
+	// subscriber.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	subscriber.DefaultUpdatedAt = subscriberDescUpdatedAt.Default.(func() time.Time)
+	// subscriber.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	subscriber.UpdateDefaultUpdatedAt = subscriberDescUpdatedAt.UpdateDefault.(func() time.Time)
 	tagMixin := schema.Tag{}.Mixin()
 	tagMixinHooks0 := tagMixin[0].Hooks()
 	tag.Hooks[0] = tagMixinHooks0[0]

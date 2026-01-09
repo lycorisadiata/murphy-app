@@ -27,8 +27,16 @@ import (
 	appParser "github.com/anzhiyu-c/anheyu-app/pkg/service/parser"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/search"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
+	"github.com/anzhiyu-c/anheyu-app/pkg/service/subscriber"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/utility"
 )
+
+// BatchDeleteResult 批量删除结果
+type BatchDeleteResult struct {
+	SuccessCount int      `json:"success_count"` // 成功删除的数量
+	FailedCount  int      `json:"failed_count"`  // 删除失败的数量
+	FailedIDs    []string `json:"failed_ids"`    // 删除失败的文章ID列表
+}
 
 type Service interface {
 	UploadArticleImage(ctx context.Context, ownerID uint, fileReader io.Reader, originalFilename string) (fileURL string, publicFileID string, err error)
@@ -38,6 +46,7 @@ type Service interface {
 	Get(ctx context.Context, publicID string) (*model.ArticleResponse, error)
 	Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip string) (*model.ArticleResponse, error)
 	Delete(ctx context.Context, publicID string) error
+	BatchDelete(ctx context.Context, publicIDs []string) (*BatchDeleteResult, error)
 	List(ctx context.Context, options *model.ListArticlesOptions) (*model.ArticleListResponse, error)
 	GetPublicBySlugOrID(ctx context.Context, slugOrID string) (*model.ArticleDetailResponse, error)
 	GetBySlugOrIDForPreview(ctx context.Context, slugOrID string) (*model.ArticleDetailResponse, error)
@@ -77,6 +86,7 @@ type serviceImpl struct {
 	searchSvc        *search.SearchService
 	primaryColorSvc  *utility.PrimaryColorService
 	cdnSvc           cdn.CDNService
+	subscriberSvc    *subscriber.Service
 
 	userRepo repository.UserRepository
 }
@@ -98,6 +108,7 @@ func NewService(
 	searchSvc *search.SearchService,
 	primaryColorSvc *utility.PrimaryColorService,
 	cdnSvc cdn.CDNService,
+	subscriberSvc *subscriber.Service,
 	userRepo repository.UserRepository,
 ) Service {
 	return &serviceImpl{
@@ -118,6 +129,7 @@ func NewService(
 		searchSvc:        searchSvc,
 		primaryColorSvc:  primaryColorSvc,
 		cdnSvc:           cdnSvc,
+		subscriberSvc:    subscriberSvc,
 		userRepo:         userRepo,
 	}
 }
@@ -172,8 +184,8 @@ func (s *serviceImpl) UploadArticleImageWithGroup(ctx context.Context, ownerID, 
 	} else if policy != nil && policy.Settings != nil {
 		// 从存储策略配置中获取样式分隔符
 		if styleSeparator, ok := policy.Settings[constant.StyleSeparatorSettingKey].(string); ok && styleSeparator != "" {
-			// 只有腾讯云COS和阿里云OSS支持样式分隔符
-			if policy.Type == constant.PolicyTypeTencentCOS || policy.Type == constant.PolicyTypeAliOSS {
+			// 腾讯云COS、阿里云OSS和七牛云支持样式分隔符
+			if policy.Type == constant.PolicyTypeTencentCOS || policy.Type == constant.PolicyTypeAliOSS || policy.Type == constant.PolicyTypeQiniu {
 				finalURL = finalURL + styleSeparator
 				log.Printf("[文章图片上传] 已拼接样式分隔符: %s，最终URL: %s", styleSeparator, finalURL)
 			}
@@ -318,6 +330,7 @@ func (s *serviceImpl) ToAPIResponse(a *model.Article, useAbbrlinkAsID bool, incl
 		CopyrightAuthorHref:  a.CopyrightAuthorHref,
 		CopyrightURL:         a.CopyrightURL,
 		Keywords:             a.Keywords,
+		ScheduledAt:          a.ScheduledAt,    // 定时发布时间
 		ReviewStatus:         a.ReviewStatus,   // 审核状态（多人共创功能）
 		OwnerID:              a.OwnerID,        // 发布者ID（多人共创功能）
 		IsTakedown:           a.IsTakedown,     // 下架状态（PRO版管理员功能）
@@ -773,6 +786,29 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 		log.Printf("[Service.Create] 最终传递给Repository的 CustomPublishedAt: %v", customPublishedAt)
 		log.Printf("[Service.Create] 最终传递给Repository的 CustomUpdatedAt: %v", customUpdatedAt)
 
+		// 解析定时发布时间
+		var scheduledAt *time.Time
+		if req.ScheduledAt != nil && *req.ScheduledAt != "" {
+			log.Printf("[Service.Create] 开始解析定时发布时间: %s", *req.ScheduledAt)
+			if parsedTime, parseErr := time.Parse(time.RFC3339, *req.ScheduledAt); parseErr == nil {
+				// 验证定时发布时间必须是未来时间
+				if parsedTime.Before(time.Now()) {
+					return fmt.Errorf("定时发布时间必须是未来时间")
+				}
+				scheduledAt = &parsedTime
+				log.Printf("[Service.Create] ✅ 解析定时发布时间成功: %v", parsedTime)
+			} else {
+				log.Printf("[Service.Create] ❌ 解析定时发布时间失败: %v", parseErr)
+				return fmt.Errorf("无效的定时发布时间格式")
+			}
+		}
+
+		// 如果设置了定时发布时间，状态必须是 SCHEDULED
+		if scheduledAt != nil && req.Status != "SCHEDULED" {
+			log.Printf("[Service.Create] 检测到定时发布时间但状态不是 SCHEDULED，自动修正状态")
+			req.Status = "SCHEDULED"
+		}
+
 		params := &model.CreateArticleParams{
 			Title:                req.Title,
 			OwnerID:              req.OwnerID,   // 文章作者ID（多人共创功能）
@@ -802,6 +838,7 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 			Keywords:             req.Keywords,
 			ReviewStatus:         req.ReviewStatus, // 审核状态（多人共创功能）
 			ExtraConfig:          req.ExtraConfig,  // 文章扩展配置
+			ScheduledAt:          scheduledAt,      // 定时发布时间
 			// 文档模式相关字段
 			IsDoc:   req.IsDoc,
 			DocSort: req.DocSort,
@@ -849,6 +886,13 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 			log.Printf("[警告] 更新搜索索引失败: %v", err)
 		}
 	}()
+
+	// 如果文章发布成功，触发订阅通知
+	if newArticle.Status == "PUBLISHED" {
+		if err := s.subscriberSvc.NotifyArticlePublished(ctx, newArticle); err != nil {
+			log.Printf("[Create] 触发订阅通知失败: %v", err)
+		}
+	}
 
 	resp := s.ToAPIResponse(newArticle, false, false)
 	s.fillOwnerNickname(ctx, resp, nil)
@@ -914,12 +958,14 @@ func (s *serviceImpl) GetPublicByID(ctx context.Context, publicID string) (*mode
 // Update 处理更新文章的业务逻辑。
 func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip string) (*model.ArticleResponse, error) {
 	var updatedArticle *model.Article
+	var oldStatus string
 
 	err := s.txManager.Do(ctx, func(repos repository.Repositories) error {
 		oldArticle, err := repos.Article.GetByID(ctx, publicID)
 		if err != nil {
 			return err
 		}
+		oldStatus = oldArticle.Status
 		oldTagIDs := make([]uint, len(oldArticle.PostTags))
 		for i, t := range oldArticle.PostTags {
 			oldTagIDs[i], _, _ = idgen.DecodePublicID(t.ID)
@@ -1047,6 +1093,31 @@ func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.Up
 			*req.CoverURL = s.settingSvc.Get(constant.KeyPostDefaultCover.String())
 		}
 
+		// 验证定时发布逻辑
+		if req.ScheduledAt != nil && *req.ScheduledAt != "" {
+			scheduledTime, parseErr := time.Parse(time.RFC3339, *req.ScheduledAt)
+			if parseErr != nil {
+				return fmt.Errorf("无效的定时发布时间格式: %w", parseErr)
+			}
+			// 验证定时发布时间必须是未来时间
+			if scheduledTime.Before(time.Now()) {
+				return fmt.Errorf("定时发布时间必须是未来时间")
+			}
+			// 如果设置了定时发布时间，状态必须是 SCHEDULED
+			if req.Status == nil || *req.Status != "SCHEDULED" {
+				scheduledStatus := "SCHEDULED"
+				req.Status = &scheduledStatus
+				log.Printf("[更新文章] 检测到定时发布时间但状态不是 SCHEDULED，自动修正状态")
+			}
+		}
+
+		// 如果状态从 SCHEDULED 改为其他状态，清除定时发布时间
+		if req.Status != nil && *req.Status != "SCHEDULED" && oldArticle.Status == "SCHEDULED" {
+			emptyScheduledAt := ""
+			req.ScheduledAt = &emptyScheduledAt
+			log.Printf("[更新文章] 状态从 SCHEDULED 变更为 %s，清除定时发布时间", *req.Status)
+		}
+
 		articleAfterUpdate, err := repos.Article.Update(ctx, publicID, req, &computedParams)
 		if err != nil {
 			return err
@@ -1146,6 +1217,13 @@ func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.Up
 		}
 	}()
 
+	// 如果文章状态从非发布变为发布，触发订阅通知
+	if oldStatus != "PUBLISHED" && updatedArticle.Status == "PUBLISHED" {
+		if err := s.subscriberSvc.NotifyArticlePublished(ctx, updatedArticle); err != nil {
+			log.Printf("[Update] 触发订阅通知失败: %v", err)
+		}
+	}
+
 	resp := s.ToAPIResponse(updatedArticle, false, false)
 	s.fillOwnerNickname(ctx, resp, nil)
 	return resp, nil
@@ -1222,6 +1300,25 @@ func (s *serviceImpl) Delete(ctx context.Context, publicID string) error {
 	}()
 
 	return nil
+}
+
+// BatchDelete 批量删除文章
+func (s *serviceImpl) BatchDelete(ctx context.Context, publicIDs []string) (*BatchDeleteResult, error) {
+	result := &BatchDeleteResult{
+		FailedIDs: make([]string, 0),
+	}
+
+	for _, publicID := range publicIDs {
+		if err := s.Delete(ctx, publicID); err != nil {
+			log.Printf("[BatchDelete] 删除文章 %s 失败: %v", publicID, err)
+			result.FailedCount++
+			result.FailedIDs = append(result.FailedIDs, publicID)
+		} else {
+			result.SuccessCount++
+		}
+	}
+
+	return result, nil
 }
 
 // diffIDs 是一个辅助函数，用于计算两个 ID 切片的差异

@@ -40,6 +40,7 @@ func (s *Service) toAPIResponse(c *model.PostCategory) *model.PostCategoryRespon
 		Description: c.Description,
 		Count:       c.Count,
 		IsSeries:    c.IsSeries,
+		SortOrder:   c.SortOrder,
 	}
 }
 

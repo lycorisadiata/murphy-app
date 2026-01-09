@@ -205,7 +205,7 @@ func (h *DirectLinkHandler) extractStyleSeparatorFromPath(fullPath, filename str
 	}
 
 	// 检查是否是支持样式分隔符的存储类型
-	if policy.Type != constant.PolicyTypeTencentCOS && policy.Type != constant.PolicyTypeAliOSS {
+	if policy.Type != constant.PolicyTypeTencentCOS && policy.Type != constant.PolicyTypeAliOSS && policy.Type != constant.PolicyTypeQiniu {
 		return ""
 	}
 

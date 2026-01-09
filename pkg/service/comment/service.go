@@ -36,19 +36,46 @@ import (
 // htmlInternalURIRegex 匹配HTML中的 src="anzhiyu://file/ID"
 var htmlInternalURIRegex = regexp.MustCompile(`src="anzhiyu://file/([a-zA-Z0-9_-]+)"`)
 
+// InAppNotificationCallback 站内通知回调接口
+// 用于PRO版本注入站内通知功能
+type InAppNotificationCallback func(ctx context.Context, data *InAppNotificationData)
+
+// InAppNotificationData 站内通知数据
+type InAppNotificationData struct {
+	CommentID      uint   // 评论ID
+	ArticleTitle   string // 文章/页面标题
+	ArticlePath    string // 文章/页面路径
+	CommenterName  string // 评论者昵称
+	CommenterEmail string // 评论者邮箱
+	CommentContent string // 评论内容
+	IsReply        bool   // 是否是回复
+	ReplyToUserID  *uint  // 被回复者用户ID（如果有）
+	ReplyToEmail   string // 被回复者邮箱
+	ReplyToName    string // 被回复者昵称
+	IsReplyToAdmin bool   // 被回复者是否是管理员
+	IsAnonymous    bool   // 是否是匿名评论
+	IsAdminComment bool   // 是否是管理员评论
+
+	// 接收者信息（用于站内通知）
+	RecipientUserID    *uint  // 接收者用户ID（如果有）
+	RecipientUserEmail string // 接收者邮箱
+	NotifyAdmin        bool   // 是否通知管理员（顶级评论通知）
+}
+
 // Service 评论服务的核心业务逻辑。
 type Service struct {
-	repo            repository.CommentRepository
-	userRepo        repository.UserRepository
-	txManager       repository.TransactionManager
-	geoService      utility.GeoIPService
-	settingSvc      setting.SettingService
-	cacheSvc        utility.CacheService
-	broker          *task.Broker
-	fileSvc         filesvc.FileService
-	parserSvc       *parser.Service
-	pushooSvc       utility.PushooService
-	notificationSvc notification.Service
+	repo                      repository.CommentRepository
+	userRepo                  repository.UserRepository
+	txManager                 repository.TransactionManager
+	geoService                utility.GeoIPService
+	settingSvc                setting.SettingService
+	cacheSvc                  utility.CacheService
+	broker                    *task.Broker
+	fileSvc                   filesvc.FileService
+	parserSvc                 *parser.Service
+	pushooSvc                 utility.PushooService
+	notificationSvc           notification.Service
+	inAppNotificationCallback InAppNotificationCallback // PRO版可注入的站内通知回调
 }
 
 // NewService 创建一个新的评论服务实例。
@@ -78,6 +105,11 @@ func NewService(
 		pushooSvc:       pushooSvc,
 		notificationSvc: notificationSvc,
 	}
+}
+
+// SetInAppNotificationCallback 设置站内通知回调（供PRO版使用）
+func (s *Service) SetInAppNotificationCallback(callback InAppNotificationCallback) {
+	s.inAppNotificationCallback = callback
 }
 
 // UploadImage 负责处理评论图片的上传业务逻辑。
@@ -365,6 +397,85 @@ func (s *Service) Create(ctx context.Context, req *dto.CreateRequest, ip, ua str
 			go s.broker.DispatchCommentNotification(newComment.ID)
 		} else {
 			log.Printf("[DEBUG] broker 为 nil，跳过邮件通知")
+		}
+
+		// 发送站内通知（PRO版功能）
+		if s.inAppNotificationCallback != nil {
+			// 获取新评论者的邮箱
+			var newCommenterEmail string
+			if newComment.Author.Email != nil {
+				newCommenterEmail = *newComment.Author.Email
+			}
+
+			// 处理可能为nil的TargetTitle
+			articleTitle := ""
+			if newComment.TargetTitle != nil {
+				articleTitle = *newComment.TargetTitle
+			}
+
+			// 获取设置
+			adminEmail := s.settingSvc.Get(constant.KeyFrontDeskSiteOwnerEmail.String())
+			notifyAdmin := s.settingSvc.GetBool(constant.KeyCommentNotifyAdmin.String())
+			notifyReply := s.settingSvc.GetBool(constant.KeyCommentNotifyReply.String())
+
+			// 场景一：通知管理员有新评论（顶级评论或回复普通用户的评论）
+			// 条件：notifyAdmin开启 + 评论者不是管理员 + 不是回复管理员的评论
+			if notifyAdmin && !newComment.IsAdminAuthor {
+				shouldNotifyAdmin := true
+				if parentComment != nil && parentComment.IsAdminAuthor {
+					// 如果是回复管理员的评论，已经会通过场景二通知
+					shouldNotifyAdmin = false
+				}
+				if shouldNotifyAdmin && adminEmail != "" && adminEmail != newCommenterEmail {
+					log.Printf("[DEBUG] 发送站内通知给管理员: %s", adminEmail)
+					go s.inAppNotificationCallback(ctx, &InAppNotificationData{
+						CommentID:          newComment.ID,
+						ArticleTitle:       articleTitle,
+						ArticlePath:        newComment.TargetPath,
+						CommenterName:      newComment.Author.Nickname,
+						CommenterEmail:     newCommenterEmail,
+						CommentContent:     newComment.Content,
+						IsReply:            false,
+						IsAnonymous:        newComment.IsAnonymous,
+						IsAdminComment:     newComment.IsAdminAuthor,
+						NotifyAdmin:        true,
+						RecipientUserEmail: adminEmail,
+					})
+				}
+			}
+
+			// 场景二：通知被回复者有新回复
+			if notifyReply && parentComment != nil {
+				var parentEmail, parentName string
+				var parentUserID *uint
+				if parentComment.Author.Email != nil {
+					parentEmail = *parentComment.Author.Email
+				}
+				parentName = parentComment.Author.Nickname
+				parentUserID = parentComment.UserID
+
+				// 避免自己回复自己
+				if parentEmail != "" && parentEmail != newCommenterEmail {
+					log.Printf("[DEBUG] 发送站内通知给被回复者: %s (%s)", parentName, parentEmail)
+					go s.inAppNotificationCallback(ctx, &InAppNotificationData{
+						CommentID:          newComment.ID,
+						ArticleTitle:       articleTitle,
+						ArticlePath:        newComment.TargetPath,
+						CommenterName:      newComment.Author.Nickname,
+						CommenterEmail:     newCommenterEmail,
+						CommentContent:     newComment.Content,
+						IsReply:            true,
+						ReplyToUserID:      parentUserID,
+						ReplyToEmail:       parentEmail,
+						ReplyToName:        parentName,
+						IsReplyToAdmin:     parentComment.IsAdminAuthor,
+						IsAnonymous:        newComment.IsAnonymous,
+						IsAdminComment:     newComment.IsAdminAuthor,
+						RecipientUserID:    parentUserID,
+						RecipientUserEmail: parentEmail,
+					})
+				}
+			}
 		}
 
 		// 发送即时通知
@@ -1235,30 +1346,54 @@ func httpGetQQInfo(apiURL, apiKey, qqNumber string) (*QQInfoResponse, error) {
 		return nil, err
 	}
 
-	// 解析API响应
-	// API返回格式: { code: 200, msg: "Success", data: { nick: "昵称", ... }, ... }
-	var apiResp struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
-			Nick   string `json:"nick"`
-			Avatar string `json:"avatar"`
-		} `json:"data"`
+	// 添加调试日志，打印原始 API 响应
+	log.Printf("[DEBUG] QQ API 原始响应: %s", string(body))
+
+	// 解析API响应 - 使用 json.RawMessage 处理 data 字段可能是字符串或对象的情况
+	// API成功返回格式: { code: 200, msg: "Success", data: { nick: "昵称", avatar: "..." }, ... }
+	// API失败返回格式: { code: xxx, msg: "Error", data: "错误信息" }
+	var baseResp struct {
+		Code int             `json:"code"`
+		Msg  string          `json:"msg"`
+		Data json.RawMessage `json:"data"`
 	}
 
-	if err := json.Unmarshal(body, &apiResp); err != nil {
+	if err := json.Unmarshal(body, &baseResp); err != nil {
 		return nil, fmt.Errorf("解析API响应失败: %w", err)
 	}
 
-	if apiResp.Code != 200 {
-		return nil, fmt.Errorf("API返回错误: %s", apiResp.Msg)
+	log.Printf("[DEBUG] QQ API 解析后 - Code: %d, Msg: %s, Data: %s", baseResp.Code, baseResp.Msg, string(baseResp.Data))
+
+	if baseResp.Code != 200 {
+		// 打印完整的 API 返回内容便于调试
+		log.Printf("[ERROR] QQ API 返回错误，完整响应: %s", string(body))
+		// 尝试解析 data 作为错误信息字符串
+		var dataStr string
+		if json.Unmarshal(baseResp.Data, &dataStr) == nil && dataStr != "" {
+			return nil, fmt.Errorf("API返回错误: %s - %s", baseResp.Msg, dataStr)
+		}
+		return nil, fmt.Errorf("API返回错误: %s", baseResp.Msg)
 	}
+
+	// 解析成功时的 data 对象
+	// API 返回格式: { qq: "xxx", nick: "昵称", email: "xxx@qq.com", avatar: "头像URL" }
+	var dataObj struct {
+		QQ     string `json:"qq"`
+		Nick   string `json:"nick"`   // 昵称字段
+		Email  string `json:"email"`  // 邮箱
+		Avatar string `json:"avatar"` // 头像URL
+	}
+	if err := json.Unmarshal(baseResp.Data, &dataObj); err != nil {
+		return nil, fmt.Errorf("解析API数据失败: %w", err)
+	}
+
+	log.Printf("[DEBUG] QQ API 解析数据 - Nick: %s, Avatar: %s", dataObj.Nick, dataObj.Avatar)
 
 	// 构建QQ头像URL
 	avatarURL := fmt.Sprintf("https://q.qlogo.cn/headimg_dl?dst_uin=%s&spec=100", qqNumber)
 
 	return &QQInfoResponse{
-		Nickname: apiResp.Data.Nick,
+		Nickname: dataObj.Nick,
 		Avatar:   avatarURL,
 	}, nil
 }

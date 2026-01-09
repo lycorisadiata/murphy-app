@@ -113,6 +113,20 @@ func (_c *PostCategoryCreate) SetNillableIsSeries(v *bool) *PostCategoryCreate {
 	return _c
 }
 
+// SetSortOrder sets the "sort_order" field.
+func (_c *PostCategoryCreate) SetSortOrder(v int) *PostCategoryCreate {
+	_c.mutation.SetSortOrder(v)
+	return _c
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_c *PostCategoryCreate) SetNillableSortOrder(v *int) *PostCategoryCreate {
+	if v != nil {
+		_c.SetSortOrder(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *PostCategoryCreate) SetID(v uint) *PostCategoryCreate {
 	_c.mutation.SetID(v)
@@ -193,6 +207,10 @@ func (_c *PostCategoryCreate) defaults() error {
 		v := postcategory.DefaultIsSeries
 		_c.mutation.SetIsSeries(v)
 	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		v := postcategory.DefaultSortOrder
+		_c.mutation.SetSortOrder(v)
+	}
 	return nil
 }
 
@@ -222,6 +240,14 @@ func (_c *PostCategoryCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsSeries(); !ok {
 		return &ValidationError{Name: "is_series", err: errors.New(`ent: missing required field "PostCategory.is_series"`)}
+	}
+	if _, ok := _c.mutation.SortOrder(); !ok {
+		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "PostCategory.sort_order"`)}
+	}
+	if v, ok := _c.mutation.SortOrder(); ok {
+		if err := postcategory.SortOrderValidator(v); err != nil {
+			return &ValidationError{Name: "sort_order", err: fmt.Errorf(`ent: validator failed for field "PostCategory.sort_order": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -283,6 +309,10 @@ func (_c *PostCategoryCreate) createSpec() (*PostCategory, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.IsSeries(); ok {
 		_spec.SetField(postcategory.FieldIsSeries, field.TypeBool, value)
 		_node.IsSeries = value
+	}
+	if value, ok := _c.mutation.SortOrder(); ok {
+		_spec.SetField(postcategory.FieldSortOrder, field.TypeInt, value)
+		_node.SortOrder = value
 	}
 	if nodes := _c.mutation.ArticlesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -442,6 +472,24 @@ func (u *PostCategoryUpsert) UpdateIsSeries() *PostCategoryUpsert {
 	return u
 }
 
+// SetSortOrder sets the "sort_order" field.
+func (u *PostCategoryUpsert) SetSortOrder(v int) *PostCategoryUpsert {
+	u.Set(postcategory.FieldSortOrder, v)
+	return u
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *PostCategoryUpsert) UpdateSortOrder() *PostCategoryUpsert {
+	u.SetExcluded(postcategory.FieldSortOrder)
+	return u
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *PostCategoryUpsert) AddSortOrder(v int) *PostCategoryUpsert {
+	u.Add(postcategory.FieldSortOrder, v)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -595,6 +643,27 @@ func (u *PostCategoryUpsertOne) SetIsSeries(v bool) *PostCategoryUpsertOne {
 func (u *PostCategoryUpsertOne) UpdateIsSeries() *PostCategoryUpsertOne {
 	return u.Update(func(s *PostCategoryUpsert) {
 		s.UpdateIsSeries()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *PostCategoryUpsertOne) SetSortOrder(v int) *PostCategoryUpsertOne {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *PostCategoryUpsertOne) AddSortOrder(v int) *PostCategoryUpsertOne {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *PostCategoryUpsertOne) UpdateSortOrder() *PostCategoryUpsertOne {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.UpdateSortOrder()
 	})
 }
 
@@ -917,6 +986,27 @@ func (u *PostCategoryUpsertBulk) SetIsSeries(v bool) *PostCategoryUpsertBulk {
 func (u *PostCategoryUpsertBulk) UpdateIsSeries() *PostCategoryUpsertBulk {
 	return u.Update(func(s *PostCategoryUpsert) {
 		s.UpdateIsSeries()
+	})
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (u *PostCategoryUpsertBulk) SetSortOrder(v int) *PostCategoryUpsertBulk {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.SetSortOrder(v)
+	})
+}
+
+// AddSortOrder adds v to the "sort_order" field.
+func (u *PostCategoryUpsertBulk) AddSortOrder(v int) *PostCategoryUpsertBulk {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.AddSortOrder(v)
+	})
+}
+
+// UpdateSortOrder sets the "sort_order" field to the value that was provided on create.
+func (u *PostCategoryUpsertBulk) UpdateSortOrder() *PostCategoryUpsertBulk {
+	return u.Update(func(s *PostCategoryUpsert) {
+		s.UpdateSortOrder()
 	})
 }
 

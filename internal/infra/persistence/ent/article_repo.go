@@ -111,6 +111,8 @@ func (r *articleRepo) toModel(a *ent.Article) *model.Article {
 		TakedownBy:     a.TakedownBy,
 		// 扩展配置字段
 		ExtraConfig: convertExtraConfig(a.ExtraConfig),
+		// 定时发布字段
+		ScheduledAt: a.ScheduledAt,
 		// 文档模式相关字段
 		IsDoc:       a.IsDoc,
 		DocSeriesID: a.DocSeriesID,
@@ -554,6 +556,12 @@ func (r *articleRepo) Create(ctx context.Context, params *model.CreateArticlePar
 		creator.SetDocSeriesID(*params.DocSeriesID)
 	}
 
+	// 设置定时发布时间
+	if params.ScheduledAt != nil {
+		log.Printf("[Repository.Create] 设置定时发布时间: %v", *params.ScheduledAt)
+		creator.SetScheduledAt(*params.ScheduledAt)
+	}
+
 	// 支持自定义发布时间
 	if params.CustomPublishedAt != nil {
 		log.Printf("[Repository.Create]设置自定义发布时间: %v", *params.CustomPublishedAt)
@@ -698,6 +706,22 @@ func (r *articleRepo) Update(ctx context.Context, publicID string, req *model.Up
 			seriesDBID, _, err := idgen.DecodePublicID(*req.DocSeriesID)
 			if err == nil {
 				updater.SetDocSeriesID(seriesDBID)
+			}
+		}
+	}
+	// 处理定时发布时间
+	if req.ScheduledAt != nil {
+		if *req.ScheduledAt == "" {
+			// 空字符串表示取消定时发布
+			log.Printf("[Repository.Update] 清除定时发布时间")
+			updater.ClearScheduledAt()
+		} else {
+			// 解析并设置定时发布时间
+			if scheduledTime, parseErr := time.Parse(time.RFC3339, *req.ScheduledAt); parseErr == nil {
+				log.Printf("[Repository.Update] 设置定时发布时间: %v", scheduledTime)
+				updater.SetScheduledAt(scheduledTime)
+			} else {
+				log.Printf("[Repository.Update] ❌ 解析定时发布时间失败: %v", parseErr)
 			}
 		}
 	}
@@ -874,6 +898,7 @@ func (r *articleRepo) List(ctx context.Context, options *model.ListArticlesOptio
 			article.FieldTakedownReason, // 下架原因
 			article.FieldTakedownAt,     // 下架时间
 			article.FieldTakedownBy,     // 下架操作人
+			article.FieldScheduledAt,    // 定时发布时间
 			article.FieldIsDoc,          // 文档模式
 			article.FieldDocSeriesID,    // 文档系列ID
 		).All(ctx)
@@ -967,4 +992,52 @@ func (r *articleRepo) Delete(ctx context.Context, publicID string) error {
 		return err
 	}
 	return r.db.Article.DeleteOneID(dbID).Exec(ctx)
+}
+
+// FindScheduledArticlesToPublish 查找所有定时发布时间已到的文章
+// 返回状态为 SCHEDULED 且 scheduled_at <= now 的文章列表
+func (r *articleRepo) FindScheduledArticlesToPublish(ctx context.Context, now time.Time) ([]*model.Article, error) {
+	entities, err := r.db.Article.Query().
+		Where(
+			article.StatusEQ(article.StatusSCHEDULED),
+			article.DeletedAtIsNil(),
+			article.ScheduledAtLTE(now),
+			article.ScheduledAtNotNil(),
+		).
+		WithPostTags().
+		WithPostCategories().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("查询定时发布文章失败: %w", err)
+	}
+	return r.toModelSlice(entities), nil
+}
+
+// PublishScheduledArticle 发布一篇定时文章
+// 将文章状态从 SCHEDULED 改为 PUBLISHED，并将 created_at 设置为 scheduled_at（保持原定时发布时间）
+func (r *articleRepo) PublishScheduledArticle(ctx context.Context, articleID uint) error {
+	// 先获取文章的 scheduled_at 时间
+	articleEntity, err := r.db.Article.Get(ctx, articleID)
+	if err != nil {
+		return fmt.Errorf("获取文章 %d 失败: %w", articleID, err)
+	}
+
+	// 更新文章状态为已发布
+	updater := r.db.Article.UpdateOneID(articleID).
+		SetStatus(article.StatusPUBLISHED).
+		ClearScheduledAt() // 清除定时发布时间
+
+	// 如果有 scheduled_at，将 created_at 设置为该时间
+	// 这样文章在前端显示的发布时间就是用户设定的定时发布时间
+	if articleEntity.ScheduledAt != nil {
+		updater.SetCreatedAt(*articleEntity.ScheduledAt)
+	}
+
+	_, err = updater.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("发布定时文章 %d 失败: %w", articleID, err)
+	}
+
+	log.Printf("[定时发布] 文章 %d 已成功发布", articleID)
+	return nil
 }

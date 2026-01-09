@@ -214,6 +214,8 @@ func (s *PrimaryColorService) getColorFromSystemFile(ctx context.Context, filePu
 		return s.getColorFromTencentCOS(ctx, file, policy)
 	case constant.PolicyTypeAliOSS:
 		return s.getColorFromAliOSS(ctx, file, policy)
+	case constant.PolicyTypeQiniu:
+		return s.getColorFromQiniu(ctx, file, policy)
 	default:
 		log.Printf("[主色调服务] 不支持的存储策略类型: %s，返回空字符串", policy.Type)
 		return ""
@@ -654,6 +656,138 @@ func (s *PrimaryColorService) getAliyunOSSDownloadURL(ctx context.Context, file 
 	downloadURL, err := provider.GetDownloadURL(ctx, policy, file.PrimaryEntity.Source.String, storage.DownloadURLOptions{})
 	if err != nil {
 		log.Printf("[主色调服务] 获取阿里云OSS下载URL失败: %v", err)
+		return ""
+	}
+
+	return downloadURL
+}
+
+// getColorFromQiniu 从七牛云Kodo获取主色调
+func (s *PrimaryColorService) getColorFromQiniu(ctx context.Context, file *model.File, policy *model.StoragePolicy) string {
+	log.Printf("[主色调服务] 使用七牛云图片处理API")
+
+	// 七牛云使用 imageAve 获取图片主色调
+	// 文档: https://developer.qiniu.com/dora/api/1268/image-average-hue
+	var imageAveURL string
+
+	// 根据存储策略是否为私有来决定URL构建方式
+	if policy.IsPrivate {
+		log.Printf("[主色调服务] 私有空间，使用带签名的图片处理URL")
+		downloadURL := s.getQiniuDownloadURL(ctx, file, policy)
+		if downloadURL == "" {
+			log.Printf("[主色调服务] 获取七牛云签名URL失败，返回空字符串")
+			return ""
+		}
+		// 在签名URL后添加图片处理参数
+		if strings.Contains(downloadURL, "?") {
+			imageAveURL = downloadURL + "&imageAve"
+		} else {
+			imageAveURL = downloadURL + "?imageAve"
+		}
+	} else {
+		log.Printf("[主色调服务] 公有空间，使用直接图片处理URL")
+		baseURL := s.buildQiniuURL(file, policy)
+		if baseURL == "" {
+			log.Printf("[主色调服务] 构建七牛云URL失败，返回空字符串")
+			return ""
+		}
+		imageAveURL = baseURL + "?imageAve"
+	}
+
+	log.Printf("[主色调服务] 七牛云 imageAve URL: %s", imageAveURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageAveURL, nil)
+	if err != nil {
+		log.Printf("[主色调服务] 创建七牛云请求失败: %v，返回空字符串", err)
+		return ""
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[主色调服务] 请求七牛云接口失败: %v，返回空字符串", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	// 如果返回403/401等权限错误，或404，降级到下载图片方式
+	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusNotFound {
+		log.Printf("[主色调服务] 七牛云接口返回%d状态码，降级到下载图片方式", resp.StatusCode)
+		downloadURL := s.getQiniuDownloadURL(ctx, file, policy)
+		if downloadURL == "" {
+			downloadURL = s.buildQiniuURL(file, policy)
+		}
+		return s.downloadAndExtractColor(ctx, downloadURL)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[主色调服务] 七牛云接口返回非200状态码: %d，尝试降级处理", resp.StatusCode)
+		downloadURL := s.getQiniuDownloadURL(ctx, file, policy)
+		if downloadURL == "" {
+			downloadURL = s.buildQiniuURL(file, policy)
+		}
+		return s.downloadAndExtractColor(ctx, downloadURL)
+	}
+
+	// 七牛云返回格式: {"RGB": "0xRRGGBB"}
+	var result struct {
+		RGB string `json:"RGB"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("[主色调服务] 解析七牛云返回数据失败: %v，返回空字符串", err)
+		return ""
+	}
+
+	// RGB格式: "0xRRGGBB"
+	if strings.HasPrefix(result.RGB, "0x") {
+		hexColor := "#" + result.RGB[2:]
+		log.Printf("[主色调服务] 从七牛云获取主色调成功: %s", hexColor)
+		return hexColor
+	}
+
+	log.Printf("[主色调服务] 七牛云返回格式异常: %s，返回空字符串", result.RGB)
+	return ""
+}
+
+// buildQiniuURL 构建七牛云的公开访问URL
+func (s *PrimaryColorService) buildQiniuURL(file *model.File, policy *model.StoragePolicy) string {
+	if !file.PrimaryEntity.Source.Valid {
+		return ""
+	}
+
+	// 从settings获取CDN域名
+	cdnDomain := ""
+	if val, ok := policy.Settings["cdn_domain"].(string); ok && val != "" {
+		cdnDomain = strings.TrimSuffix(val, "/")
+	}
+	if cdnDomain == "" {
+		log.Printf("[主色调服务] 七牛云策略缺少cdn_domain配置")
+		return ""
+	}
+
+	// 确保有协议前缀
+	if !strings.HasPrefix(cdnDomain, "http://") && !strings.HasPrefix(cdnDomain, "https://") {
+		cdnDomain = "https://" + cdnDomain
+	}
+
+	return fmt.Sprintf("%s/%s", cdnDomain, file.PrimaryEntity.Source.String)
+}
+
+// getQiniuDownloadURL 获取七牛云的下载URL（可能包含签名）
+func (s *PrimaryColorService) getQiniuDownloadURL(ctx context.Context, file *model.File, policy *model.StoragePolicy) string {
+	if !file.PrimaryEntity.Source.Valid {
+		log.Printf("[主色调服务] 文件Source字段无效")
+		return ""
+	}
+
+	provider, exists := s.storageProviders[constant.PolicyTypeQiniu]
+	if !exists {
+		log.Printf("[主色调服务] 七牛云存储提供者不存在")
+		return ""
+	}
+
+	downloadURL, err := provider.GetDownloadURL(ctx, policy, file.PrimaryEntity.Source.String, storage.DownloadURLOptions{})
+	if err != nil {
+		log.Printf("[主色调服务] 获取七牛云下载URL失败: %v", err)
 		return ""
 	}
 

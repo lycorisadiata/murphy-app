@@ -184,10 +184,23 @@ const (
 	KeyPostCopyCopyrightReprint  SettingKey = "post.copy.copyright_reprint"  // 转载文章版权信息模板
 
 	// 文章目录 Hash 更新配置
-	KeyPostTocHashUpdateMode SettingKey = "post.toc.hash_update_mode" // 目录滚动时URL Hash更新模式: replace(替换不产生历史), none(不更新)
+	KeyPostTocHashUpdateMode SettingKey = "post.toc.hash_update_mode" // 目录滚动是否更新URL Hash: replace(启用), none(禁用)
 
 	// 文章页面波浪区域配置
 	KeyPostWavesEnable SettingKey = "post.waves.enable" // 是否显示文章页面波浪区域
+
+	// 文章底部版权声明配置
+	KeyPostCopyrightOriginalTemplate          SettingKey = "post.copyright.original_template"            // 原创文章版权声明模板
+	KeyPostCopyrightReprintTemplateWithUrl    SettingKey = "post.copyright.reprint_template_with_url"    // 转载文章版权声明模板（有原文链接）
+	KeyPostCopyrightReprintTemplateWithoutUrl SettingKey = "post.copyright.reprint_template_without_url" // 转载文章版权声明模板（无原文链接）
+
+	// 文章订阅配置
+	KeyPostSubscribeEnable       SettingKey = "post.subscribe.enable"        // 是否启用订阅功能
+	KeyPostSubscribeButtonText   SettingKey = "post.subscribe.button_text"   // 订阅按钮文案
+	KeyPostSubscribeDialogTitle  SettingKey = "post.subscribe.dialog_title"  // 订阅弹窗标题
+	KeyPostSubscribeDialogDesc   SettingKey = "post.subscribe.dialog_desc"   // 订阅弹窗描述
+	KeyPostSubscribeMailSubject  SettingKey = "post.subscribe.mail_subject"  // 订阅邮件主题模板
+	KeyPostSubscribeMailTemplate SettingKey = "post.subscribe.mail_template" // 订阅邮件HTML模板
 
 	KeyPostEquipmentBannerBackground  SettingKey = "equipment.banner.background"
 	KeyPostEquipmentBannerTitle       SettingKey = "equipment.banner.title"
@@ -250,6 +263,7 @@ const (
 	KeySidebarWechatFace             SettingKey = "sidebar.wechat.face"
 	KeySidebarWechatBackFace         SettingKey = "sidebar.wechat.backFace"
 	KeySidebarWechatBlurBackground   SettingKey = "sidebar.wechat.blurBackground"
+	KeySidebarWechatLink             SettingKey = "sidebar.wechat.link"
 	KeySidebarTagsEnable             SettingKey = "sidebar.tags.enable"
 	KeySidebarTagsHighlight          SettingKey = "sidebar.tags.highlight"
 	KeySidebarSiteInfoRuntimeEnable  SettingKey = "sidebar.siteinfo.runtimeEnable"
@@ -321,15 +335,16 @@ const (
 	KeyAboutPageEnableCustomCode  SettingKey = "about.page.enable.custom_code"
 	KeyAboutPageEnableComment     SettingKey = "about.page.enable.comment"
 
-	KeyMusicPlayerEnable         SettingKey = "music.player.enable"
-	KeyMusicPlayerPlaylistID     SettingKey = "music.player.playlist_id"
-	KeyMusicPlayerCustomPlaylist SettingKey = "music.player.custom_playlist"
-	KeyMusicAPIBaseURL           SettingKey = "music.api.base_url"
-	KeyMusicVinylBackground      SettingKey = "music.vinyl.background"
-	KeyMusicVinylOuter           SettingKey = "music.vinyl.outer"
-	KeyMusicVinylInner           SettingKey = "music.vinyl.inner"
-	KeyMusicVinylNeedle          SettingKey = "music.vinyl.needle"
-	KeyMusicVinylGroove          SettingKey = "music.vinyl.groove"
+	KeyMusicPlayerEnable          SettingKey = "music.player.enable"
+	KeyMusicPlayerPlaylistID      SettingKey = "music.player.playlist_id"
+	KeyMusicPlayerCustomPlaylist  SettingKey = "music.player.custom_playlist"
+	KeyMusicCapsuleCustomPlaylist SettingKey = "music.capsule.custom_playlist"
+	KeyMusicAPIBaseURL            SettingKey = "music.api.base_url"
+	KeyMusicVinylBackground       SettingKey = "music.vinyl.background"
+	KeyMusicVinylOuter            SettingKey = "music.vinyl.outer"
+	KeyMusicVinylInner            SettingKey = "music.vinyl.inner"
+	KeyMusicVinylNeedle           SettingKey = "music.vinyl.needle"
+	KeyMusicVinylGroove           SettingKey = "music.vinyl.groove"
 
 	// --- CDN缓存清除配置 ---
 	KeyCDNEnable    SettingKey = "cdn.enable"

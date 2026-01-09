@@ -17,6 +17,7 @@ const (
 	PolicyTypeTencentCOS StoragePolicyType = "tencent_cos"
 	PolicyTypeAliOSS     StoragePolicyType = "aliyun_oss"
 	PolicyTypeS3         StoragePolicyType = "aws_s3"
+	PolicyTypeQiniu      StoragePolicyType = "qiniu_kodo"
 
 	// UploadMethodSettingKey 是存储策略中定义上传方式的键
 	UploadMethodSettingKey = "upload_method"
@@ -53,7 +54,7 @@ const (
 // IsValid 检查给定的类型是否是受支持的存储策略类型
 func (t StoragePolicyType) IsValid() bool {
 	switch t {
-	case PolicyTypeLocal, PolicyTypeOneDrive, PolicyTypeTencentCOS, PolicyTypeAliOSS, PolicyTypeS3:
+	case PolicyTypeLocal, PolicyTypeOneDrive, PolicyTypeTencentCOS, PolicyTypeAliOSS, PolicyTypeS3, PolicyTypeQiniu:
 		return true
 	default:
 		return false

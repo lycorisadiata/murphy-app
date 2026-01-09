@@ -31,6 +31,8 @@ type PostCategory struct {
 	Count int `json:"count,omitempty"`
 	// 是否为系列
 	IsSeries bool `json:"is_series,omitempty"`
+	// 分类排序值，数值越小越靠前
+	SortOrder int `json:"sort_order,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PostCategoryQuery when eager-loading is set.
 	Edges        PostCategoryEdges `json:"edges"`
@@ -62,7 +64,7 @@ func (*PostCategory) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case postcategory.FieldIsSeries:
 			values[i] = new(sql.NullBool)
-		case postcategory.FieldID, postcategory.FieldCount:
+		case postcategory.FieldID, postcategory.FieldCount, postcategory.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
 		case postcategory.FieldName, postcategory.FieldDescription:
 			values[i] = new(sql.NullString)
@@ -132,6 +134,12 @@ func (_m *PostCategory) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.IsSeries = value.Bool
 			}
+		case postcategory.FieldSortOrder:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field sort_order", values[i])
+			} else if value.Valid {
+				_m.SortOrder = int(value.Int64)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -195,6 +203,9 @@ func (_m *PostCategory) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_series=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsSeries))
+	builder.WriteString(", ")
+	builder.WriteString("sort_order=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
 	builder.WriteByte(')')
 	return builder.String()
 }

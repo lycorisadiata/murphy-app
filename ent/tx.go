@@ -50,6 +50,8 @@ type Tx struct {
 	Setting *SettingClient
 	// StoragePolicy is the client for interacting with the StoragePolicy builders.
 	StoragePolicy *StoragePolicyClient
+	// Subscriber is the client for interacting with the Subscriber builders.
+	Subscriber *SubscriberClient
 	// Tag is the client for interacting with the Tag builders.
 	Tag *TagClient
 	// URLStat is the client for interacting with the URLStat builders.
@@ -216,6 +218,7 @@ func (tx *Tx) init() {
 	tx.PostTag = NewPostTagClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.StoragePolicy = NewStoragePolicyClient(tx.config)
+	tx.Subscriber = NewSubscriberClient(tx.config)
 	tx.Tag = NewTagClient(tx.config)
 	tx.URLStat = NewURLStatClient(tx.config)
 	tx.User = NewUserClient(tx.config)

@@ -71,6 +71,11 @@ func (PostCategory) Fields() []ent.Field {
 		field.Bool("is_series").
 			Comment("是否为系列").
 			Default(false),
+
+		field.Int("sort_order").
+			Comment("分类排序值，数值越小越靠前").
+			Default(0).
+			NonNegative(),
 	}
 }
 

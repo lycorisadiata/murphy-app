@@ -55,7 +55,7 @@ func (Article) Fields() []ent.Field {
 		field.Text("content_md").Comment("文章的 Markdown 原文").Optional(),
 		field.Text("content_html").Comment("由 content_md 解析和净化后的 HTML").Optional(),
 		field.String("cover_url").Comment("封面图URL").Optional(),
-		field.Enum("status").Values("DRAFT", "PUBLISHED", "ARCHIVED").Default("DRAFT"),
+		field.Enum("status").Values("DRAFT", "PUBLISHED", "ARCHIVED", "SCHEDULED").Default("DRAFT"),
 		field.Int("view_count").Comment("浏览次数").Default(0).NonNegative(),
 		field.Int("word_count").Comment("总字数").Default(0).NonNegative(),
 		field.Int("reading_time").Comment("阅读时长(分钟)").Default(0).NonNegative(),
@@ -105,6 +105,12 @@ func (Article) Fields() []ent.Field {
 			Comment("文章关键词，用于SEO优化").
 			Optional(),
 
+		// --- 定时发布相关字段 ---
+		field.Time("scheduled_at").
+			Comment("定时发布时间，当status为SCHEDULED时有效").
+			Optional().
+			Nillable(),
+
 		// --- 审核相关字段（多人共创功能） ---
 		field.Enum("review_status").
 			Values("NONE", "PENDING", "APPROVED", "REJECTED").
@@ -142,6 +148,11 @@ func (Article) Fields() []ent.Field {
 		field.JSON("extra_config", map[string]interface{}{}).
 			Optional().
 			Comment("文章扩展配置（JSON格式，用于存储各种可选功能配置，如 enable_ai_podcast 等）"),
+
+		// --- 会员权益相关字段 ---
+		field.Bool("exclude_from_membership").
+			Comment("是否排除在会员权益外：true表示会员也需要单独购买此文章").
+			Default(false),
 
 		// --- 文档模式相关字段 ---
 		field.Bool("is_doc").

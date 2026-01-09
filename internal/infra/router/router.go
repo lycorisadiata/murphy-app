@@ -34,6 +34,7 @@ import (
 	sitemap_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/sitemap"
 	statistics_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/statistics"
 	storage_policy_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/storage_policy"
+	subscriber_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/subscriber"
 	theme_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/theme"
 	thumbnail_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/thumbnail"
 	user_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/user"
@@ -86,6 +87,7 @@ type Router struct {
 	notificationHandler       *notification_handler.Handler
 	configBackupHandler       *config_handler.ConfigBackupHandler
 	configImportExportHandler *config_handler.ConfigImportExportHandler
+	subscriberHandler         *subscriber_handler.Handler
 }
 
 // NewRouter 是 Router 的构造函数，通过依赖注入接收所有处理器。
@@ -118,6 +120,7 @@ func NewRouter(
 	notificationHandler *notification_handler.Handler,
 	configBackupHandler *config_handler.ConfigBackupHandler,
 	configImportExportHandler *config_handler.ConfigImportExportHandler,
+	subscriberHandler *subscriber_handler.Handler,
 ) *Router {
 	return &Router{
 		authHandler:               authHandler,
@@ -148,6 +151,7 @@ func NewRouter(
 		notificationHandler:       notificationHandler,
 		configBackupHandler:       configBackupHandler,
 		configImportExportHandler: configImportExportHandler,
+		subscriberHandler:         subscriberHandler,
 	}
 }
 
@@ -311,6 +315,8 @@ func (r *Router) registerArticleRoutes(api *gin.RouterGroup) {
 		// 文章导入导出功能（仅管理员可用）
 		articlesAdmin.POST("/export", r.articleHandler.ExportArticles)
 		articlesAdmin.POST("/import", r.articleHandler.ImportArticles)
+		// 批量删除文章（仅管理员可用）
+		articlesAdmin.DELETE("/batch", r.articleHandler.BatchDelete)
 	}
 
 	articlesPublic := api.Group("/public/articles")
@@ -441,6 +447,12 @@ func (r *Router) registerPublicRoutes(api *gin.RouterGroup) {
 		public.GET("/album-categories", r.publicHandler.GetPublicAlbumCategories)
 		public.PUT("/stat/:id", r.publicHandler.UpdateAlbumStat)
 		public.GET("/site-config", r.settingHandler.GetSiteConfig)
+
+		// 订阅相关路由
+		public.POST("/subscribe", middleware.CustomRateLimit(3, 3), r.subscriberHandler.Subscribe)
+		public.POST("/subscribe/code", middleware.CustomRateLimit(3, 3), r.subscriberHandler.SendVerificationCode)
+		public.POST("/unsubscribe", r.subscriberHandler.Unsubscribe)
+		public.GET("/unsubscribe/:token", r.subscriberHandler.UnsubscribeByToken)
 	}
 }
 

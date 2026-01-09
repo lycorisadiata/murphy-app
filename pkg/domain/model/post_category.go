@@ -20,6 +20,7 @@ type PostCategory struct {
 	Description string
 	Count       int
 	IsSeries    bool
+	SortOrder   int
 }
 
 // --- API 数据传输对象 (Data Transfer Objects) ---
@@ -29,6 +30,7 @@ type CreatePostCategoryRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
 	IsSeries    bool   `json:"is_series"`
+	SortOrder   int    `json:"sort_order"`
 }
 
 // UpdatePostCategoryRequest 定义了更新文章分类的请求体
@@ -36,6 +38,7 @@ type UpdatePostCategoryRequest struct {
 	Name        *string `json:"name"`
 	Description *string `json:"description"`
 	IsSeries    *bool   `json:"is_series"`
+	SortOrder   *int    `json:"sort_order"`
 }
 
 // PostCategoryResponse 定义了文章分类的标准 API 响应结构
@@ -47,4 +50,5 @@ type PostCategoryResponse struct {
 	Description string    `json:"description"`
 	Count       int       `json:"count"`
 	IsSeries    bool      `json:"is_series"`
+	SortOrder   int       `json:"sort_order"`
 }

@@ -125,6 +125,27 @@ func (_u *PostCategoryUpdate) SetNillableIsSeries(v *bool) *PostCategoryUpdate {
 	return _u
 }
 
+// SetSortOrder sets the "sort_order" field.
+func (_u *PostCategoryUpdate) SetSortOrder(v int) *PostCategoryUpdate {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *PostCategoryUpdate) SetNillableSortOrder(v *int) *PostCategoryUpdate {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *PostCategoryUpdate) AddSortOrder(v int) *PostCategoryUpdate {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
 // AddArticleIDs adds the "articles" edge to the Article entity by IDs.
 func (_u *PostCategoryUpdate) AddArticleIDs(ids ...uint) *PostCategoryUpdate {
 	_u.mutation.AddArticleIDs(ids...)
@@ -220,6 +241,11 @@ func (_u *PostCategoryUpdate) check() error {
 			return &ValidationError{Name: "count", err: fmt.Errorf(`ent: validator failed for field "PostCategory.count": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SortOrder(); ok {
+		if err := postcategory.SortOrderValidator(v); err != nil {
+			return &ValidationError{Name: "sort_order", err: fmt.Errorf(`ent: validator failed for field "PostCategory.sort_order": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -267,6 +293,12 @@ func (_u *PostCategoryUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.IsSeries(); ok {
 		_spec.SetField(postcategory.FieldIsSeries, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(postcategory.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(postcategory.FieldSortOrder, field.TypeInt, value)
 	}
 	if _u.mutation.ArticlesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -430,6 +462,27 @@ func (_u *PostCategoryUpdateOne) SetNillableIsSeries(v *bool) *PostCategoryUpdat
 	return _u
 }
 
+// SetSortOrder sets the "sort_order" field.
+func (_u *PostCategoryUpdateOne) SetSortOrder(v int) *PostCategoryUpdateOne {
+	_u.mutation.ResetSortOrder()
+	_u.mutation.SetSortOrder(v)
+	return _u
+}
+
+// SetNillableSortOrder sets the "sort_order" field if the given value is not nil.
+func (_u *PostCategoryUpdateOne) SetNillableSortOrder(v *int) *PostCategoryUpdateOne {
+	if v != nil {
+		_u.SetSortOrder(*v)
+	}
+	return _u
+}
+
+// AddSortOrder adds value to the "sort_order" field.
+func (_u *PostCategoryUpdateOne) AddSortOrder(v int) *PostCategoryUpdateOne {
+	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
 // AddArticleIDs adds the "articles" edge to the Article entity by IDs.
 func (_u *PostCategoryUpdateOne) AddArticleIDs(ids ...uint) *PostCategoryUpdateOne {
 	_u.mutation.AddArticleIDs(ids...)
@@ -538,6 +591,11 @@ func (_u *PostCategoryUpdateOne) check() error {
 			return &ValidationError{Name: "count", err: fmt.Errorf(`ent: validator failed for field "PostCategory.count": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SortOrder(); ok {
+		if err := postcategory.SortOrderValidator(v); err != nil {
+			return &ValidationError{Name: "sort_order", err: fmt.Errorf(`ent: validator failed for field "PostCategory.sort_order": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -602,6 +660,12 @@ func (_u *PostCategoryUpdateOne) sqlSave(ctx context.Context) (_node *PostCatego
 	}
 	if value, ok := _u.mutation.IsSeries(); ok {
 		_spec.SetField(postcategory.FieldIsSeries, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SortOrder(); ok {
+		_spec.SetField(postcategory.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSortOrder(); ok {
+		_spec.AddField(postcategory.FieldSortOrder, field.TypeInt, value)
 	}
 	if _u.mutation.ArticlesCleared() {
 		edge := &sqlgraph.EdgeSpec{
