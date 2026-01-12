@@ -354,6 +354,7 @@ const (
 	KeyCDNRegion    SettingKey = "cdn.region"
 	KeyCDNDomain    SettingKey = "cdn.domain"
 	KeyCDNZoneID    SettingKey = "cdn.zone_id"
+	KeyCDNBaseURL   SettingKey = "cdn.base_url"
 
 	// --- 相册页面配置 ---
 	KeyAlbumPageBannerBackground     SettingKey = "album.banner.background"
@@ -368,4 +369,9 @@ const (
 	KeyAlbumPageApiURL               SettingKey = "album.api_url"
 	KeyAlbumPageDefaultThumbParam    SettingKey = "album.default_thumb_param"
 	KeyAlbumPageDefaultBigParam      SettingKey = "album.default_big_param"
+
+	// --- Cloudflare Turnstile 人机验证配置 ---
+	KeyTurnstileEnable    SettingKey = "turnstile.enable"     // 是否启用 Turnstile 人机验证
+	KeyTurnstileSiteKey   SettingKey = "turnstile.site_key"   // Turnstile Site Key（公钥，前端使用）
+	KeyTurnstileSecretKey SettingKey = "turnstile.secret_key" // Turnstile Secret Key（私钥，后端验证使用）
 )

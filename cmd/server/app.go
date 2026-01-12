@@ -89,6 +89,7 @@ import (
 	subscriber_service "github.com/anzhiyu-c/anheyu-app/pkg/service/subscriber"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/theme"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/thumbnail"
+	turnstile_service "github.com/anzhiyu-c/anheyu-app/pkg/service/turnstile"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/user"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/utility"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/volume"
@@ -313,8 +314,8 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		log.Printf("[DEBUG] 默认通知类型初始化完成")
 	}
 
-	// 初始化邮件服务（需要 notificationSvc）
-	emailSvc := utility.NewEmailService(settingSvc, notificationSvc)
+	// 初始化邮件服务（需要 notificationSvc 和 parserSvc 用于表情包解析）
+	emailSvc := utility.NewEmailService(settingSvc, notificationSvc, parserSvc)
 
 	taskBroker := task.NewBroker(uploadSvc, thumbnailSvc, cleanupSvc, articleRepo, commentRepo, emailSvc, cacheSvc, linkCategoryRepo, linkTagRepo, linkRepo, settingSvc, statService)
 	pageSvc := page_service.NewService(pageRepo)
@@ -377,7 +378,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	subscriberSvc := subscriber_service.NewService(entClient, redisClient, emailSvc)
 	subscriberHandler := subscriber_handler.NewHandler(subscriberSvc)
 
-	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, subscriberSvc, userRepo)
+	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, pageRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, subscriberSvc, userRepo)
 	log.Printf("[DEBUG] 正在初始化 PushooService...")
 	pushooSvc := utility.NewPushooService(settingSvc)
 	log.Printf("[DEBUG] PushooService 初始化完成")
@@ -408,9 +409,14 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	configImportExportSvc := config_service.NewImportExportService(settingRepo, settingSvc)
 	log.Printf("[DEBUG] ConfigImportExportService 初始化完成")
 
+	// 初始化 Turnstile 人机验证服务
+	log.Printf("[DEBUG] 正在初始化 TurnstileService...")
+	turnstileSvc := turnstile_service.NewTurnstileService(settingSvc)
+	log.Printf("[DEBUG] TurnstileService 初始化完成")
+
 	// --- Phase 6: 初始化表现层 (Handlers) ---
 	mw := middleware.NewMiddleware(tokenSvc)
-	authHandler := auth_handler.NewAuthHandler(authSvc, tokenSvc, settingSvc)
+	authHandler := auth_handler.NewAuthHandler(authSvc, tokenSvc, settingSvc, turnstileSvc)
 	albumHandler := album_handler.NewAlbumHandler(albumSvc)
 	albumCategoryHandler := album_category_handler.NewHandler(albumCategorySvc)
 	userHandler := user_handler.NewUserHandler(userSvc, settingSvc, fileSvc, directLinkSvc)

@@ -1041,3 +1041,28 @@ func (r *articleRepo) PublishScheduledArticle(ctx context.Context, articleID uin
 	log.Printf("[定时发布] 文章 %d 已成功发布", articleID)
 	return nil
 }
+
+// ExistsByAbbrlink 检查 abbrlink 是否已被其他文章使用
+// excludeDBID 为 0 时检查所有文章，否则排除指定 ID 的文章
+func (r *articleRepo) ExistsByAbbrlink(ctx context.Context, abbrlink string, excludeDBID uint) (bool, error) {
+	if abbrlink == "" {
+		return false, nil
+	}
+
+	query := r.db.Article.Query().
+		Where(
+			article.AbbrlinkEQ(abbrlink),
+			article.DeletedAtIsNil(),
+		)
+
+	if excludeDBID > 0 {
+		query = query.Where(article.IDNEQ(excludeDBID))
+	}
+
+	exists, err := query.Exist(ctx)
+	if err != nil {
+		return false, fmt.Errorf("检查 abbrlink 是否存在失败: %w", err)
+	}
+
+	return exists, nil
+}

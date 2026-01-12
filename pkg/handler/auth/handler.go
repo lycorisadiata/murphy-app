@@ -11,30 +11,34 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/auth"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
+	"github.com/anzhiyu-c/anheyu-app/pkg/service/turnstile"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler 封装了所有认证相关的控制器方法
 type AuthHandler struct {
-	authSvc    auth.AuthService
-	tokenSvc   auth.TokenService
-	settingSvc setting.SettingService
+	authSvc      auth.AuthService
+	tokenSvc     auth.TokenService
+	settingSvc   setting.SettingService
+	turnstileSvc turnstile.TurnstileService
 }
 
 // NewAuthHandler 是 AuthHandler 的构造函数，用于依赖注入
-func NewAuthHandler(authSvc auth.AuthService, tokenSvc auth.TokenService, settingSvc setting.SettingService) *AuthHandler {
+func NewAuthHandler(authSvc auth.AuthService, tokenSvc auth.TokenService, settingSvc setting.SettingService, turnstileSvc turnstile.TurnstileService) *AuthHandler {
 	return &AuthHandler{
-		authSvc:    authSvc,
-		tokenSvc:   tokenSvc,
-		settingSvc: settingSvc,
+		authSvc:      authSvc,
+		tokenSvc:     tokenSvc,
+		settingSvc:   settingSvc,
+		turnstileSvc: turnstileSvc,
 	}
 }
 
 // LoginRequest 定义了登录请求的结构
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email          string `json:"email" binding:"required,email"`
+	Password       string `json:"password" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"` // Cloudflare Turnstile 验证 token
 }
 
 // RegisterRequest 定义了注册请求的结构
@@ -43,6 +47,7 @@ type RegisterRequest struct {
 	Nickname       string `json:"nickname" binding:"required"`
 	Password       string `json:"password" binding:"required,min=6"`
 	RepeatPassword string `json:"repeat_password" binding:"required"`
+	TurnstileToken string `json:"turnstile_token"` // Cloudflare Turnstile 验证 token
 }
 
 // RefreshTokenRequest 定义了刷新令牌请求的结构
@@ -108,6 +113,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "邮箱或密码格式不正确")
+		return
+	}
+
+	// 0. 验证 Turnstile 人机验证（如果启用）
+	if err := h.turnstileSvc.Verify(c.Request.Context(), req.TurnstileToken, c.ClientIP()); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -198,6 +209,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 	if req.Password != req.RepeatPassword {
 		response.Fail(c, http.StatusBadRequest, "两次输入的密码不一致")
+		return
+	}
+
+	// 验证 Turnstile 人机验证（如果启用）
+	if err := h.turnstileSvc.Verify(c.Request.Context(), req.TurnstileToken, c.ClientIP()); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
 

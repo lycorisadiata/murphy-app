@@ -2,6 +2,7 @@
 package cdn
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -47,7 +48,7 @@ func NewService(settingSvc setting.SettingService) CDNService {
 }
 
 // getConfig 从配置系统中获取CDN配置
-func (s *serviceImpl) getConfig() (enabled bool, provider, secretID, secretKey, region, domain, zoneID string) {
+func (s *serviceImpl) getConfig() (enabled bool, provider, secretID, secretKey, region, domain, zoneID, baseUrl string) {
 	enabled = s.settingSvc.Get(constant.KeyCDNEnable.String()) == "true"
 	provider = s.settingSvc.Get(constant.KeyCDNProvider.String())
 	secretID = s.settingSvc.Get(constant.KeyCDNSecretID.String())
@@ -55,6 +56,7 @@ func (s *serviceImpl) getConfig() (enabled bool, provider, secretID, secretKey, 
 	region = s.settingSvc.Get(constant.KeyCDNRegion.String())
 	domain = s.settingSvc.Get(constant.KeyCDNDomain.String())
 	zoneID = s.settingSvc.Get(constant.KeyCDNZoneID.String())
+	baseUrl = s.settingSvc.Get(constant.KeyCDNBaseURL.String())
 
 	// 设置默认地域
 	if region == "" {
@@ -70,7 +72,7 @@ func (s *serviceImpl) getConfig() (enabled bool, provider, secretID, secretKey, 
 
 // PurgeCache 清除指定URL的CDN缓存
 func (s *serviceImpl) PurgeCache(ctx context.Context, urls []string) error {
-	enabled, provider, _, _, _, _, _ := s.getConfig()
+	enabled, provider, _, _, _, _, _, _ := s.getConfig()
 	if !enabled {
 		log.Printf("[CDN] 缓存清除功能未启用，跳过清除操作")
 		return nil
@@ -89,6 +91,8 @@ func (s *serviceImpl) PurgeCache(ctx context.Context, urls []string) error {
 		return s.purgeEdgeOneCache(ctx, urls)
 	case "aliyun-esa":
 		return s.purgeAliyunESACache(ctx, urls)
+	case "cdnfly":
+		return s.purgeCDNflyCache(ctx, urls)
 	default:
 		log.Printf("[CDN] 不支持的CDN提供商: %s", provider)
 		return nil
@@ -97,7 +101,7 @@ func (s *serviceImpl) PurgeCache(ctx context.Context, urls []string) error {
 
 // PurgeByTags 根据缓存标签清除CDN缓存
 func (s *serviceImpl) PurgeByTags(ctx context.Context, tags []string) error {
-	enabled, provider, _, _, _, _, _ := s.getConfig()
+	enabled, provider, _, _, _, _, _, _ := s.getConfig()
 	if !enabled {
 		log.Printf("[CDN] 缓存清除功能未启用，跳过标签清除操作")
 		return nil
@@ -120,7 +124,7 @@ func (s *serviceImpl) PurgeByTags(ctx context.Context, tags []string) error {
 
 // PurgeArticleCache 清除文章相关的CDN缓存
 func (s *serviceImpl) PurgeArticleCache(ctx context.Context, articleID string) error {
-	enabled, _, _, _, _, _, _ := s.getConfig()
+	enabled, _, _, _, _, _, _, _ := s.getConfig()
 	if !enabled {
 		return nil
 	}
@@ -174,7 +178,7 @@ func (s *serviceImpl) PurgeArticleCache(ctx context.Context, articleID string) e
 
 // purgeTencentCache 清除腾讯云CDN缓存
 func (s *serviceImpl) purgeTencentCache(ctx context.Context, urls []string) error {
-	_, _, secretID, secretKey, region, domain, _ := s.getConfig()
+	_, _, secretID, secretKey, region, domain, _, _ := s.getConfig()
 	if secretID == "" || secretKey == "" || domain == "" {
 		log.Printf("[CDN] 腾讯云CDN配置不完整，跳过缓存清除")
 		return nil
@@ -203,7 +207,7 @@ func (s *serviceImpl) purgeTencentCache(ctx context.Context, urls []string) erro
 
 // purgeEdgeOneCache 清除EdgeOne缓存
 func (s *serviceImpl) purgeEdgeOneCache(ctx context.Context, urls []string) error {
-	_, _, secretID, secretKey, region, _, zoneID := s.getConfig()
+	_, _, secretID, secretKey, region, _, zoneID, _ := s.getConfig()
 	if secretID == "" || secretKey == "" || zoneID == "" {
 		log.Printf("[CDN] EdgeOne配置不完整，跳过缓存清除")
 		return nil
@@ -235,7 +239,7 @@ func (s *serviceImpl) purgeEdgeOneCache(ctx context.Context, urls []string) erro
 
 // purgeEdgeOneByTags 根据标签清除EdgeOne缓存
 func (s *serviceImpl) purgeEdgeOneByTags(ctx context.Context, tags []string) error {
-	_, _, secretID, secretKey, region, _, zoneID := s.getConfig()
+	_, _, secretID, secretKey, region, _, zoneID, _ := s.getConfig()
 	if secretID == "" || secretKey == "" || zoneID == "" {
 		log.Printf("[CDN] EdgeOne配置不完整，跳过标签缓存清除")
 		return nil
@@ -376,7 +380,7 @@ func (s *serviceImpl) hmacSha256(key []byte, data string) []byte {
 
 // purgeAliyunESACache 清除阿里云ESA缓存
 func (s *serviceImpl) purgeAliyunESACache(ctx context.Context, urls []string) error {
-	_, _, accessKeyID, accessKeySecret, _, _, siteID := s.getConfig()
+	_, _, accessKeyID, accessKeySecret, _, _, siteID, _ := s.getConfig()
 	if accessKeyID == "" || accessKeySecret == "" || siteID == "" {
 		log.Printf("[CDN] 阿里云ESA配置不完整，跳过缓存清除")
 		return nil
@@ -541,4 +545,74 @@ func (s *serviceImpl) percentEncode(str string) string {
 // base64Encode Base64编码
 func (s *serviceImpl) base64Encode(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
+}
+
+// purgeCDNflyCache 清除 CDNFLY 缓存
+func (s *serviceImpl) purgeCDNflyCache(ctx context.Context, urls []string) error {
+	_, _, secretID, secretKey, _, _, _, baseURL := s.getConfig()
+	if secretID == "" || secretKey == "" || baseURL == "" {
+		log.Printf("[CDN] CDNFLY配置不完整，跳过缓存清除")
+		return nil
+	}
+
+	// 构建请求体
+	params := []map[string]interface{}{}
+	for _, url := range urls {
+		param := map[string]interface{}{
+			"type": "clean_url",
+			"data": map[string]string{
+				"url": url,
+			},
+		}
+		params = append(params, param)
+	}
+
+	// 将参数序列化为 JSON
+	jsonData, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("构建请求体失败: %w", err)
+	}
+
+	// 创建HTTP请求
+	apiURL := baseURL + "/v1/jobs"
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jsonData))
+	if err != nil {
+		return fmt.Errorf("创建HTTP请求失败: %w", err)
+	}
+
+	log.Printf("[CDNFLY] 请求URL: %s, 请求体: %s", apiURL, string(jsonData))
+
+	// 设置请求头
+	req.Header.Set("api-key", secretKey)
+	req.Header.Set("api-secret", secretID)
+
+	// 发送请求
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 检查响应状态
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("CDNFLY API 返回错误: %d, %s", resp.StatusCode, string(body))
+	}
+
+	// 解析响应，检查是否有错误
+	var response map[string]interface{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	if errorInfo, exists := response["Error"]; exists {
+		return fmt.Errorf("CDNFLY 业务错误: %v", errorInfo)
+	}
+
+	return nil
 }

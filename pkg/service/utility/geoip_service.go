@@ -25,14 +25,21 @@ type GeoIPService interface {
 }
 
 // apiResponse 定义了远程 IP API 返回的 JSON 数据的结构。
-// 如果你更换API服务商，可能需要修改这个结构体以匹配新的JSON格式。
+// 适配 NSUUU ipip API（全球 IPv4/IPv6 信息查询）
 type apiResponse struct {
-	Code int `json:"code"`
-	Data struct {
-		Country  string `json:"country"`
-		Province string `json:"province"`
-		City     string `json:"city"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		IP        string `json:"ip"`
+		Country   string `json:"country"`
+		Province  string `json:"province"`
+		City      string `json:"city"`
+		ISP       string `json:"isp"`
+		Latitude  string `json:"latitude"`
+		Longitude string `json:"longitude"`
+		Address   string `json:"address"`
 	} `json:"data"`
+	RequestID string `json:"request_id"`
 }
 
 // smartGeoIPService 是现在唯一的服务实现，仅通过远程API查询。
@@ -80,25 +87,26 @@ func (s *smartGeoIPService) Lookup(ipStr string) (string, error) {
 }
 
 // lookupViaAPI 封装了调用远程 API 的逻辑。
+// 使用 NSUUU ipv1 API，支持 Bearer Token 认证方式
 func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string, error) {
-	// 构建请求URL，但在日志中隐藏Token信息
-	reqURL := fmt.Sprintf("%s?key=%s&ip=%s", apiURL, apiToken, ipStr)
-	logSafeURL := fmt.Sprintf("%s?key=***&ip=%s", apiURL, ipStr)
+	// 构建请求URL，只包含ip参数，key通过Header传递
+	reqURL := fmt.Sprintf("%s?ip=%s", apiURL, ipStr)
 
-	log.Printf("[IP属地查询] 准备调用第三方API - URL: %s", logSafeURL)
+	log.Printf("[IP属地查询] 准备调用第三方API - URL: %s", reqURL)
 
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
-		// 避免在日志中暴露完整的URL和Token信息
-		log.Printf("[IP属地查询] ❌ 创建HTTP请求失败 - IP: %s, 目标: %s", ipStr, logSafeURL)
+		log.Printf("[IP属地查询] ❌ 创建HTTP请求失败 - IP: %s, 目标: %s", ipStr, reqURL)
 		return "", fmt.Errorf("创建 API 请求失败: %w", err)
 	}
 
-	log.Printf("[IP属地查询] 发送HTTP请求到第三方API...")
+	// 使用 Bearer Token 方式传递 API Key（推荐方式，更安全）
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+
+	log.Printf("[IP属地查询] 发送HTTP请求到第三方API（使用Bearer Token认证）...")
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		// 避免在日志中暴露完整的URL和Token信息
-		log.Printf("[IP属地查询] ❌ HTTP请求失败 - IP: %s, 目标: %s, 错误类型: %T", ipStr, logSafeURL, err)
+		log.Printf("[IP属地查询] ❌ HTTP请求失败 - IP: %s, 目标: %s, 错误类型: %T", ipStr, reqURL, err)
 		return "", fmt.Errorf("API 请求网络错误: %w", err)
 	}
 	defer resp.Body.Close()
@@ -120,8 +128,8 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string
 		ipStr, result.Code, result.Data.Country, result.Data.Province, result.Data.City)
 
 	if result.Code != 200 {
-		log.Printf("[IP属地查询] ❌ API返回业务错误 - IP: %s, 错误码: %d", ipStr, result.Code)
-		return "", fmt.Errorf("API 返回业务错误码: %d", result.Code)
+		log.Printf("[IP属地查询] ❌ API返回业务错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, result.Code, result.Message)
+		return "", fmt.Errorf("API 返回业务错误码: %d, 信息: %s", result.Code, result.Message)
 	}
 
 	province := result.Data.Province

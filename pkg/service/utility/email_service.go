@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anzhiyu-c/anheyu-app/internal/pkg/parser"
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/model"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/notification"
+	parser_service "github.com/anzhiyu-c/anheyu-app/pkg/service/parser"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
 )
 
@@ -43,13 +43,15 @@ type EmailService interface {
 type emailService struct {
 	settingSvc      setting.SettingService
 	notificationSvc notification.Service
+	parserSvc       *parser_service.Service
 }
 
 // NewEmailService 是 emailService 的构造函数
-func NewEmailService(settingSvc setting.SettingService, notificationSvc notification.Service) EmailService {
+func NewEmailService(settingSvc setting.SettingService, notificationSvc notification.Service, parserSvc *parser_service.Service) EmailService {
 	return &emailService{
 		settingSvc:      settingSvc,
 		notificationSvc: notificationSvc,
+		parserSvc:       parserSvc,
 	}
 }
 
@@ -169,6 +171,7 @@ func (s *emailService) SendLinkApplicationNotification(ctx context.Context, link
 
 // SendCommentNotification 实现了发送评论通知的逻辑
 func (s *emailService) SendCommentNotification(newComment *model.Comment, parentComment *model.Comment) {
+	ctx := context.Background()
 	log.Printf("[DEBUG] SendCommentNotification 开始执行，评论ID: %d", newComment.ID)
 
 	siteName := s.settingSvc.Get(constant.KeyAppName.String())
@@ -197,7 +200,18 @@ func (s *emailService) SendCommentNotification(newComment *model.Comment, parent
 	gravatarURL = strings.TrimRight(gravatarURL, "/") + "/avatar/"
 	defaultGravatar := s.settingSvc.Get(constant.KeyDefaultGravatarType.String())
 
-	newCommentHTML, _ := parser.MarkdownToHTML(newComment.Content)
+	var newCommentHTML string
+	if s.parserSvc != nil {
+		var err error
+		newCommentHTML, err = s.parserSvc.ToHTML(ctx, newComment.Content)
+		if err != nil {
+			log.Printf("[WARNING] 解析新评论内容失败，将使用原始内容: %v", err)
+			newCommentHTML = newComment.Content
+		}
+	} else {
+		// 如果 parserSvc 为空，直接使用原始内容
+		newCommentHTML = newComment.Content
+	}
 	var newCommenterEmail string
 	var newCommentEmailMD5 string
 	if newComment.Author.Email != nil {
@@ -320,7 +334,17 @@ func (s *emailService) SendCommentNotification(newComment *model.Comment, parent
 
 		log.Printf("[DEBUG] 准备发送回复通知邮件到: %s", parentEmail)
 
-		parentCommentHTML, _ := parser.MarkdownToHTML(parentComment.Content)
+		var parentCommentHTML string
+		if s.parserSvc != nil {
+			var err error
+			parentCommentHTML, err = s.parserSvc.ToHTML(ctx, parentComment.Content)
+			if err != nil {
+				log.Printf("[WARNING] 解析父评论内容失败，将使用原始内容: %v", err)
+				parentCommentHTML = parentComment.Content
+			}
+		} else {
+			parentCommentHTML = parentComment.Content
+		}
 		parentCommentEmailMD5 := fmt.Sprintf("%x", md5.Sum([]byte(strings.ToLower(parentEmail))))
 
 		replySubjectTpl := s.settingSvc.Get(constant.KeyCommentMailSubject.String())

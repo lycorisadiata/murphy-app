@@ -74,6 +74,7 @@ type serviceImpl struct {
 	postCategoryRepo repository.PostCategoryRepository
 	commentRepo      repository.CommentRepository
 	docSeriesRepo    repository.DocSeriesRepository
+	pageRepo         repository.PageRepository
 	txManager        repository.TransactionManager
 	cacheSvc         utility.CacheService
 	geoService       utility.GeoIPService
@@ -97,6 +98,7 @@ func NewService(
 	postCategoryRepo repository.PostCategoryRepository,
 	commentRepo repository.CommentRepository,
 	docSeriesRepo repository.DocSeriesRepository,
+	pageRepo repository.PageRepository,
 	txManager repository.TransactionManager,
 	cacheSvc utility.CacheService,
 	geoService utility.GeoIPService,
@@ -117,6 +119,7 @@ func NewService(
 		postCategoryRepo: postCategoryRepo,
 		commentRepo:      commentRepo,
 		docSeriesRepo:    docSeriesRepo,
+		pageRepo:         pageRepo,
 		txManager:        txManager,
 		cacheSvc:         cacheSvc,
 		geoService:       geoService,
@@ -277,6 +280,76 @@ func calculatePostStats(content string) (wordCount, readingTime int) {
 		readingTime = 1
 	}
 	return wordCount, readingTime
+}
+
+// reservedPaths 系统保留路径列表，文章的 abbrlink 不能与这些路径冲突
+var reservedPaths = []string{
+	"posts", "page", "tags", "categories", "archives", "about", "link",
+	"admin", "api", "login", "redirect", "album", "music", "external-link-warning",
+	"activate", "error", "static", "random-post", "air-conditioner", "equipment",
+	"recentcomments", "update", "doc", "essay", "sitemap", "robots.txt", "feed",
+	"rss", "atom", "search", "privacy", "copyright", "404", "500",
+}
+
+// validateAbbrlink 验证 abbrlink 格式并检查路径冲突
+// excludeDBID 为 0 时是新建文章，否则是更新文章（排除自身）
+func (s *serviceImpl) validateAbbrlink(ctx context.Context, abbrlink string, excludeDBID uint) error {
+	if abbrlink == "" {
+		return nil // 空值允许，会自动生成
+	}
+
+	// 1. 长度限制
+	if len(abbrlink) > 200 {
+		return errors.New("永久链接长度不能超过200个字符")
+	}
+
+	// 2. 不能包含斜杠（abbrlink 仅用于自定义文章ID，不支持路径格式）
+	if strings.Contains(abbrlink, "/") {
+		return errors.New("永久链接不能包含斜杠 /（仅支持自定义文章ID，不支持路径格式）")
+	}
+
+	// 3. 检查特殊字符（允许字母、数字、中文、连字符、下划线、点）
+	for _, char := range abbrlink {
+		if unicode.IsLetter(char) || unicode.IsDigit(char) || unicode.Is(unicode.Han, char) {
+			continue
+		}
+		if char == '-' || char == '_' || char == '.' {
+			continue
+		}
+		return fmt.Errorf("永久链接包含不允许的字符: %c（只允许字母、数字、中文、连字符-、下划线_、点.）", char)
+	}
+
+	// 4. 检查系统保留路径冲突
+	firstSegmentLower := strings.ToLower(abbrlink)
+	for _, reserved := range reservedPaths {
+		if firstSegmentLower == reserved {
+			return fmt.Errorf("永久链接不能以系统保留路径 '%s' 开头", reserved)
+		}
+	}
+
+	// 5. 检查与自定义页面路径的冲突
+	// 自定义页面路径存储格式为 /path，所以需要添加前导斜杠
+	pagePath := "/" + abbrlink
+	if s.pageRepo != nil {
+		exists, err := s.pageRepo.ExistsByPath(ctx, pagePath, "")
+		if err != nil {
+			log.Printf("[validateAbbrlink] 检查自定义页面路径冲突时出错: %v", err)
+			// 不阻止操作，只记录日志
+		} else if exists {
+			return fmt.Errorf("永久链接 '%s' 与已存在的自定义页面路径冲突", abbrlink)
+		}
+	}
+
+	// 6. 检查与其他文章 abbrlink 的冲突
+	exists, err := s.repo.ExistsByAbbrlink(ctx, abbrlink, excludeDBID)
+	if err != nil {
+		return fmt.Errorf("检查永久链接冲突失败: %w", err)
+	}
+	if exists {
+		return fmt.Errorf("永久链接 '%s' 已被其他文章使用", abbrlink)
+	}
+
+	return nil
 }
 
 // ToAPIResponse 将领域模型转换为用于API响应的DTO。
@@ -662,6 +735,11 @@ func (s *serviceImpl) GetBySlugOrIDForPreview(ctx context.Context, slugOrID stri
 
 // Create 处理创建新文章的完整业务流程。
 func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleRequest, ip string) (*model.ArticleResponse, error) {
+	// 验证 abbrlink（在事务外进行，避免不必要的事务开销）
+	if err := s.validateAbbrlink(ctx, req.Abbrlink, 0); err != nil {
+		return nil, err
+	}
+
 	var newArticle *model.Article
 	sanitizedHTML := s.parserSvc.SanitizeHTML(req.ContentHTML)
 
@@ -957,6 +1035,17 @@ func (s *serviceImpl) GetPublicByID(ctx context.Context, publicID string) (*mode
 
 // Update 处理更新文章的业务逻辑。
 func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip string) (*model.ArticleResponse, error) {
+	// 如果更新了 abbrlink，进行验证
+	if req.Abbrlink != nil {
+		dbID, _, err := idgen.DecodePublicID(publicID)
+		if err != nil {
+			return nil, fmt.Errorf("无效的文章ID: %w", err)
+		}
+		if err := s.validateAbbrlink(ctx, *req.Abbrlink, dbID); err != nil {
+			return nil, err
+		}
+	}
+
 	var updatedArticle *model.Article
 	var oldStatus string
 
@@ -1067,8 +1156,9 @@ func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.Up
 			req.Summaries = filteredSummaries
 		}
 
-		if req.IPLocation != nil && *req.IPLocation == "" {
-			log.Printf("[更新文章] 检测到IPLocation为空字符串，开始自动获取IP属地 - 传入IP: %s", ip)
+		// 当 IP 属地为空字符串或"未知"时，尝试重新获取
+		if req.IPLocation != nil && (*req.IPLocation == "" || *req.IPLocation == "未知") {
+			log.Printf("[更新文章] 检测到IPLocation为'%s'，开始自动获取IP属地 - 传入IP: %s", *req.IPLocation, ip)
 			location := "未知"
 
 			if ip == "" {
