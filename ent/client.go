@@ -18,6 +18,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/album"
 	"github.com/anzhiyu-c/anheyu-app/ent/albumcategory"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/directlink"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
@@ -56,6 +57,8 @@ type Client struct {
 	AlbumCategory *AlbumCategoryClient
 	// Article is the client for interacting with the Article builders.
 	Article *ArticleClient
+	// ArticleHistory is the client for interacting with the ArticleHistory builders.
+	ArticleHistory *ArticleHistoryClient
 	// Comment is the client for interacting with the Comment builders.
 	Comment *CommentClient
 	// DirectLink is the client for interacting with the DirectLink builders.
@@ -120,6 +123,7 @@ func (c *Client) init() {
 	c.Album = NewAlbumClient(c.config)
 	c.AlbumCategory = NewAlbumCategoryClient(c.config)
 	c.Article = NewArticleClient(c.config)
+	c.ArticleHistory = NewArticleHistoryClient(c.config)
 	c.Comment = NewCommentClient(c.config)
 	c.DirectLink = NewDirectLinkClient(c.config)
 	c.DocSeries = NewDocSeriesClient(c.config)
@@ -240,6 +244,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Album:                  NewAlbumClient(cfg),
 		AlbumCategory:          NewAlbumCategoryClient(cfg),
 		Article:                NewArticleClient(cfg),
+		ArticleHistory:         NewArticleHistoryClient(cfg),
 		Comment:                NewCommentClient(cfg),
 		DirectLink:             NewDirectLinkClient(cfg),
 		DocSeries:              NewDocSeriesClient(cfg),
@@ -287,6 +292,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Album:                  NewAlbumClient(cfg),
 		AlbumCategory:          NewAlbumCategoryClient(cfg),
 		Article:                NewArticleClient(cfg),
+		ArticleHistory:         NewArticleHistoryClient(cfg),
 		Comment:                NewCommentClient(cfg),
 		DirectLink:             NewDirectLinkClient(cfg),
 		DocSeries:              NewDocSeriesClient(cfg),
@@ -341,9 +347,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Album, c.AlbumCategory, c.Article, c.Comment, c.DirectLink, c.DocSeries,
-		c.Entity, c.File, c.FileEntity, c.Link, c.LinkCategory, c.LinkTag, c.Metadata,
-		c.NotificationType, c.Page, c.PostCategory, c.PostTag, c.Setting,
+		c.Album, c.AlbumCategory, c.Article, c.ArticleHistory, c.Comment, c.DirectLink,
+		c.DocSeries, c.Entity, c.File, c.FileEntity, c.Link, c.LinkCategory, c.LinkTag,
+		c.Metadata, c.NotificationType, c.Page, c.PostCategory, c.PostTag, c.Setting,
 		c.StoragePolicy, c.Subscriber, c.Tag, c.URLStat, c.User, c.UserGroup,
 		c.UserInstalledTheme, c.UserNotificationConfig, c.VisitorLog, c.VisitorStat,
 	} {
@@ -355,9 +361,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Album, c.AlbumCategory, c.Article, c.Comment, c.DirectLink, c.DocSeries,
-		c.Entity, c.File, c.FileEntity, c.Link, c.LinkCategory, c.LinkTag, c.Metadata,
-		c.NotificationType, c.Page, c.PostCategory, c.PostTag, c.Setting,
+		c.Album, c.AlbumCategory, c.Article, c.ArticleHistory, c.Comment, c.DirectLink,
+		c.DocSeries, c.Entity, c.File, c.FileEntity, c.Link, c.LinkCategory, c.LinkTag,
+		c.Metadata, c.NotificationType, c.Page, c.PostCategory, c.PostTag, c.Setting,
 		c.StoragePolicy, c.Subscriber, c.Tag, c.URLStat, c.User, c.UserGroup,
 		c.UserInstalledTheme, c.UserNotificationConfig, c.VisitorLog, c.VisitorStat,
 	} {
@@ -374,6 +380,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.AlbumCategory.mutate(ctx, m)
 	case *ArticleMutation:
 		return c.Article.mutate(ctx, m)
+	case *ArticleHistoryMutation:
+		return c.ArticleHistory.mutate(ctx, m)
 	case *CommentMutation:
 		return c.Comment.mutate(ctx, m)
 	case *DirectLinkMutation:
@@ -884,6 +892,22 @@ func (c *ArticleClient) QueryComments(_m *Article) *CommentQuery {
 	return query
 }
 
+// QueryHistories queries the histories edge of a Article.
+func (c *ArticleClient) QueryHistories(_m *Article) *ArticleHistoryQuery {
+	query := (&ArticleHistoryClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(article.Table, article.FieldID, id),
+			sqlgraph.To(articlehistory.Table, articlehistory.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, article.HistoriesTable, article.HistoriesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryDocSeries queries the doc_series edge of a Article.
 func (c *ArticleClient) QueryDocSeries(_m *Article) *DocSeriesQuery {
 	query := (&DocSeriesClient{config: c.config}).Query()
@@ -923,6 +947,155 @@ func (c *ArticleClient) mutate(ctx context.Context, m *ArticleMutation) (Value, 
 		return (&ArticleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Article mutation op: %q", m.Op())
+	}
+}
+
+// ArticleHistoryClient is a client for the ArticleHistory schema.
+type ArticleHistoryClient struct {
+	config
+}
+
+// NewArticleHistoryClient returns a client for the ArticleHistory from the given config.
+func NewArticleHistoryClient(c config) *ArticleHistoryClient {
+	return &ArticleHistoryClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `articlehistory.Hooks(f(g(h())))`.
+func (c *ArticleHistoryClient) Use(hooks ...Hook) {
+	c.hooks.ArticleHistory = append(c.hooks.ArticleHistory, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `articlehistory.Intercept(f(g(h())))`.
+func (c *ArticleHistoryClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ArticleHistory = append(c.inters.ArticleHistory, interceptors...)
+}
+
+// Create returns a builder for creating a ArticleHistory entity.
+func (c *ArticleHistoryClient) Create() *ArticleHistoryCreate {
+	mutation := newArticleHistoryMutation(c.config, OpCreate)
+	return &ArticleHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ArticleHistory entities.
+func (c *ArticleHistoryClient) CreateBulk(builders ...*ArticleHistoryCreate) *ArticleHistoryCreateBulk {
+	return &ArticleHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ArticleHistoryClient) MapCreateBulk(slice any, setFunc func(*ArticleHistoryCreate, int)) *ArticleHistoryCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ArticleHistoryCreateBulk{err: fmt.Errorf("calling to ArticleHistoryClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ArticleHistoryCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ArticleHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ArticleHistory.
+func (c *ArticleHistoryClient) Update() *ArticleHistoryUpdate {
+	mutation := newArticleHistoryMutation(c.config, OpUpdate)
+	return &ArticleHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ArticleHistoryClient) UpdateOne(_m *ArticleHistory) *ArticleHistoryUpdateOne {
+	mutation := newArticleHistoryMutation(c.config, OpUpdateOne, withArticleHistory(_m))
+	return &ArticleHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ArticleHistoryClient) UpdateOneID(id uint) *ArticleHistoryUpdateOne {
+	mutation := newArticleHistoryMutation(c.config, OpUpdateOne, withArticleHistoryID(id))
+	return &ArticleHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ArticleHistory.
+func (c *ArticleHistoryClient) Delete() *ArticleHistoryDelete {
+	mutation := newArticleHistoryMutation(c.config, OpDelete)
+	return &ArticleHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ArticleHistoryClient) DeleteOne(_m *ArticleHistory) *ArticleHistoryDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ArticleHistoryClient) DeleteOneID(id uint) *ArticleHistoryDeleteOne {
+	builder := c.Delete().Where(articlehistory.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ArticleHistoryDeleteOne{builder}
+}
+
+// Query returns a query builder for ArticleHistory.
+func (c *ArticleHistoryClient) Query() *ArticleHistoryQuery {
+	return &ArticleHistoryQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeArticleHistory},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ArticleHistory entity by its id.
+func (c *ArticleHistoryClient) Get(ctx context.Context, id uint) (*ArticleHistory, error) {
+	return c.Query().Where(articlehistory.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ArticleHistoryClient) GetX(ctx context.Context, id uint) *ArticleHistory {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryArticle queries the article edge of a ArticleHistory.
+func (c *ArticleHistoryClient) QueryArticle(_m *ArticleHistory) *ArticleQuery {
+	query := (&ArticleClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(articlehistory.Table, articlehistory.FieldID, id),
+			sqlgraph.To(article.Table, article.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, articlehistory.ArticleTable, articlehistory.ArticleColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ArticleHistoryClient) Hooks() []Hook {
+	return c.hooks.ArticleHistory
+}
+
+// Interceptors returns the client interceptors.
+func (c *ArticleHistoryClient) Interceptors() []Interceptor {
+	return c.inters.ArticleHistory
+}
+
+func (c *ArticleHistoryClient) mutate(ctx context.Context, m *ArticleHistoryMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ArticleHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ArticleHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ArticleHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ArticleHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ArticleHistory mutation op: %q", m.Op())
 	}
 }
 
@@ -4780,17 +4953,17 @@ func (c *VisitorStatClient) mutate(ctx context.Context, m *VisitorStatMutation) 
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Album, AlbumCategory, Article, Comment, DirectLink, DocSeries, Entity, File,
-		FileEntity, Link, LinkCategory, LinkTag, Metadata, NotificationType, Page,
-		PostCategory, PostTag, Setting, StoragePolicy, Subscriber, Tag, URLStat, User,
-		UserGroup, UserInstalledTheme, UserNotificationConfig, VisitorLog,
-		VisitorStat []ent.Hook
+		Album, AlbumCategory, Article, ArticleHistory, Comment, DirectLink, DocSeries,
+		Entity, File, FileEntity, Link, LinkCategory, LinkTag, Metadata,
+		NotificationType, Page, PostCategory, PostTag, Setting, StoragePolicy,
+		Subscriber, Tag, URLStat, User, UserGroup, UserInstalledTheme,
+		UserNotificationConfig, VisitorLog, VisitorStat []ent.Hook
 	}
 	inters struct {
-		Album, AlbumCategory, Article, Comment, DirectLink, DocSeries, Entity, File,
-		FileEntity, Link, LinkCategory, LinkTag, Metadata, NotificationType, Page,
-		PostCategory, PostTag, Setting, StoragePolicy, Subscriber, Tag, URLStat, User,
-		UserGroup, UserInstalledTheme, UserNotificationConfig, VisitorLog,
-		VisitorStat []ent.Interceptor
+		Album, AlbumCategory, Article, ArticleHistory, Comment, DirectLink, DocSeries,
+		Entity, File, FileEntity, Link, LinkCategory, LinkTag, Metadata,
+		NotificationType, Page, PostCategory, PostTag, Setting, StoragePolicy,
+		Subscriber, Tag, URLStat, User, UserGroup, UserInstalledTheme,
+		UserNotificationConfig, VisitorLog, VisitorStat []ent.Interceptor
 	}
 )

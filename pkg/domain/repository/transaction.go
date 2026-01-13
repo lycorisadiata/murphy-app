@@ -12,21 +12,22 @@ import "context"
 
 // Repositories 结构体聚合了所有在单个事务中可能用到的仓储接口。
 type Repositories struct {
-	File          FileRepository
-	Entity        EntityRepository
-	FileEntity    FileEntityRepository
-	Metadata      MetadataRepository
-	StoragePolicy StoragePolicyRepository
-	DirectLink    DirectLinkRepository
-	User          UserRepository
-	UserGroup     UserGroupRepository
-	Article       ArticleRepository
-	PostTag       PostTagRepository
-	PostCategory  PostCategoryRepository
-	DocSeries     DocSeriesRepository
-	Link          LinkRepository
-	LinkCategory  LinkCategoryRepository
-	LinkTag       LinkTagRepository
+	File           FileRepository
+	Entity         EntityRepository
+	FileEntity     FileEntityRepository
+	Metadata       MetadataRepository
+	StoragePolicy  StoragePolicyRepository
+	DirectLink     DirectLinkRepository
+	User           UserRepository
+	UserGroup      UserGroupRepository
+	Article        ArticleRepository
+	ArticleHistory ArticleHistoryRepository
+	PostTag        PostTagRepository
+	PostCategory   PostCategoryRepository
+	DocSeries      DocSeriesRepository
+	Link           LinkRepository
+	LinkCategory   LinkCategoryRepository
+	LinkTag        LinkTagRepository
 }
 
 // TransactionManager 定义了事务管理器的接口。

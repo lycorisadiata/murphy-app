@@ -15,6 +15,7 @@ import (
 	album_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/album"
 	album_category_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/album_category"
 	article_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article"
+	article_history_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article_history"
 	auth_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/auth"
 	comment_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/comment"
 	config_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/config"
@@ -70,6 +71,7 @@ type Router struct {
 	directLinkHandler         *direct_link_handler.DirectLinkHandler
 	thumbnailHandler          *thumbnail_handler.ThumbnailHandler
 	articleHandler            *article_handler.Handler
+	articleHistoryHandler     *article_history_handler.Handler
 	postTagHandler            *post_tag_handler.Handler
 	postCategoryHandler       *post_category_handler.Handler
 	docSeriesHandler          *doc_series_handler.Handler
@@ -103,6 +105,7 @@ func NewRouter(
 	directLinkHandler *direct_link_handler.DirectLinkHandler,
 	thumbnailHandler *thumbnail_handler.ThumbnailHandler,
 	articleHandler *article_handler.Handler,
+	articleHistoryHandler *article_history_handler.Handler,
 	postTagHandler *post_tag_handler.Handler,
 	postCategoryHandler *post_category_handler.Handler,
 	docSeriesHandler *doc_series_handler.Handler,
@@ -134,6 +137,7 @@ func NewRouter(
 		directLinkHandler:         directLinkHandler,
 		thumbnailHandler:          thumbnailHandler,
 		articleHandler:            articleHandler,
+		articleHistoryHandler:     articleHistoryHandler,
 		postTagHandler:            postTagHandler,
 		postCategoryHandler:       postCategoryHandler,
 		docSeriesHandler:          docSeriesHandler,
@@ -306,6 +310,15 @@ func (r *Router) registerArticleRoutes(api *gin.RouterGroup) {
 		articlesUser.DELETE("/:id", r.articleHandler.Delete)
 		// 获取文章（普通用户只能获取自己的文章，权限在handler层校验）
 		articlesUser.GET("/:id", r.articleHandler.Get)
+
+		// 文章历史版本相关路由（需要登录）
+		if r.articleHistoryHandler != nil {
+			articlesUser.GET("/:id/history", r.articleHistoryHandler.ListHistory)
+			articlesUser.GET("/:id/history/count", r.articleHistoryHandler.GetHistoryCount)
+			articlesUser.GET("/:id/history/compare", r.articleHistoryHandler.CompareVersions)
+			articlesUser.GET("/:id/history/:version", r.articleHistoryHandler.GetVersion)
+			articlesUser.POST("/:id/history/:version/restore", r.articleHistoryHandler.RestoreVersion)
+		}
 	}
 
 	// 后台管理接口，需要认证和管理员权限（保留用于向后兼容）

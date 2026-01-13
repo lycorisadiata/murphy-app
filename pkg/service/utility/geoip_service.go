@@ -10,6 +10,7 @@ package utility
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -39,6 +40,14 @@ type apiResponse struct {
 		Longitude string `json:"longitude"`
 		Address   string `json:"address"`
 	} `json:"data"`
+	RequestID string `json:"request_id"`
+}
+
+// apiKeyErrorResponse 定义了远程 IP API 密钥错误时查询返回的 JSON 数据的结构。
+type apiKeyErrorResponse struct {
+	Code      int    `json:"code"`
+	Msg       string `json:"msg"`
+	Data      string `json:"data"`
 	RequestID string `json:"request_id"`
 }
 
@@ -118,10 +127,26 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string
 		return "", fmt.Errorf("API 返回非 200 状态码: %s", resp.Status)
 	}
 
+	// 读取整个响应体
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取响应体失败: %w", err)
+	}
+
+	// 1. 尝试解析为apiKeyErrorResponse
+	var keyErrorResult apiKeyErrorResponse
+	if err := json.Unmarshal(body, &keyErrorResult); err == nil {
+		// 如果能解析成功，说明是API KEY错误
+		log.Printf("[IP属地查询] ❌ API KEY错误 - IP: %s", ipStr)
+		return "", fmt.Errorf("API KEY配置错误")
+	}
+
+	// 2. 上述错误结构无法解析，尝试解析为正常响应
 	var result apiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
+		// 如果这里也解析失败，才报告JSON解析失败
 		log.Printf("[IP属地查询] ❌ 解析API响应JSON失败 - IP: %s, 错误: %v", ipStr, err)
-		return "", fmt.Errorf("解析 API 响应 JSON 失败: %w", err)
+		return "", fmt.Errorf("解析API响应JSON失败: %w", err)
 	}
 
 	log.Printf("[IP属地查询] API响应解析成功 - IP: %s, 业务码: %d, 国家: %s, 省份: %s, 城市: %s",

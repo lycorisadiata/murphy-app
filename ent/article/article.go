@@ -102,6 +102,8 @@ const (
 	EdgePostCategories = "post_categories"
 	// EdgeComments holds the string denoting the comments edge name in mutations.
 	EdgeComments = "comments"
+	// EdgeHistories holds the string denoting the histories edge name in mutations.
+	EdgeHistories = "histories"
 	// EdgeDocSeries holds the string denoting the doc_series edge name in mutations.
 	EdgeDocSeries = "doc_series"
 	// Table holds the table name of the article in the database.
@@ -123,6 +125,13 @@ const (
 	CommentsInverseTable = "comments"
 	// CommentsColumn is the table column denoting the comments relation/edge.
 	CommentsColumn = "article_comments"
+	// HistoriesTable is the table that holds the histories relation/edge.
+	HistoriesTable = "article_histories"
+	// HistoriesInverseTable is the table name for the ArticleHistory entity.
+	// It exists in this package in order to avoid circular dependency with the "articlehistory" package.
+	HistoriesInverseTable = "article_histories"
+	// HistoriesColumn is the table column denoting the histories relation/edge.
+	HistoriesColumn = "article_id"
 	// DocSeriesTable is the table that holds the doc_series relation/edge.
 	DocSeriesTable = "articles"
 	// DocSeriesInverseTable is the table name for the DocSeries entity.
@@ -547,6 +556,20 @@ func ByComments(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByHistoriesCount orders the results by histories count.
+func ByHistoriesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newHistoriesStep(), opts...)
+	}
+}
+
+// ByHistories orders the results by histories terms.
+func ByHistories(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newHistoriesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByDocSeriesField orders the results by doc_series field.
 func ByDocSeriesField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -572,6 +595,13 @@ func newCommentsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(CommentsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, CommentsTable, CommentsColumn),
+	)
+}
+func newHistoriesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(HistoriesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, HistoriesTable, HistoriesColumn),
 	)
 }
 func newDocSeriesStep() *sqlgraph.Step {

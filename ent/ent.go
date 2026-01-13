@@ -15,6 +15,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/album"
 	"github.com/anzhiyu-c/anheyu-app/ent/albumcategory"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/directlink"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
@@ -103,6 +104,7 @@ func checkColumn(t, c string) error {
 			album.Table:                  album.ValidColumn,
 			albumcategory.Table:          albumcategory.ValidColumn,
 			article.Table:                article.ValidColumn,
+			articlehistory.Table:         articlehistory.ValidColumn,
 			comment.Table:                comment.ValidColumn,
 			directlink.Table:             directlink.ValidColumn,
 			docseries.Table:              docseries.ValidColumn,

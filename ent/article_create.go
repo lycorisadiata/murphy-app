@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
 	"github.com/anzhiyu-c/anheyu-app/ent/postcategory"
@@ -613,6 +614,21 @@ func (_c *ArticleCreate) AddComments(v ...*Comment) *ArticleCreate {
 	return _c.AddCommentIDs(ids...)
 }
 
+// AddHistoryIDs adds the "histories" edge to the ArticleHistory entity by IDs.
+func (_c *ArticleCreate) AddHistoryIDs(ids ...uint) *ArticleCreate {
+	_c.mutation.AddHistoryIDs(ids...)
+	return _c
+}
+
+// AddHistories adds the "histories" edges to the ArticleHistory entity.
+func (_c *ArticleCreate) AddHistories(v ...*ArticleHistory) *ArticleCreate {
+	ids := make([]uint, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddHistoryIDs(ids...)
+}
+
 // SetDocSeries sets the "doc_series" edge to the DocSeries entity.
 func (_c *ArticleCreate) SetDocSeries(v *DocSeries) *ArticleCreate {
 	return _c.SetDocSeriesID(v.ID)
@@ -1067,6 +1083,22 @@ func (_c *ArticleCreate) createSpec() (*Article, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(comment.FieldID, field.TypeUint),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.HistoriesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
 			},
 		}
 		for _, k := range nodes {

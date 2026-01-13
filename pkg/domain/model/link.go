@@ -26,7 +26,7 @@ type LinkCategoryDTO struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Style       string `json:"style"`
-	Description string `json:"description,omitempty"`
+	Description string `json:"description"`
 }
 
 type LinkTagDTO struct {

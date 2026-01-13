@@ -37,6 +37,7 @@ import (
 	album_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/album"
 	album_category_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/album_category"
 	article_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article"
+	article_history_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article_history"
 	auth_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/auth"
 	comment_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/comment"
 	config_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/config"
@@ -65,6 +66,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/album"
 	album_category_service "github.com/anzhiyu-c/anheyu-app/pkg/service/album_category"
 	article_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article"
+	article_history_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article_history"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/auth"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/cdn"
 	cleanup_service "github.com/anzhiyu-c/anheyu-app/pkg/service/cleanup"
@@ -210,6 +212,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	storagePolicyRepo := ent_impl.NewEntStoragePolicyRepository(entClient)
 	metadataRepo := ent_impl.NewEntMetadataRepository(entClient)
 	articleRepo := ent_impl.NewArticleRepo(entClient, dbType)
+	articleHistoryRepo := ent_impl.NewArticleHistoryRepo(entClient)
 	postTagRepo := ent_impl.NewPostTagRepo(entClient, dbType)
 	postCategoryRepo := ent_impl.NewPostCategoryRepo(entClient)
 	docSeriesRepo := ent_impl.NewDocSeriesRepo(entClient)
@@ -317,7 +320,10 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	// 初始化邮件服务（需要 notificationSvc 和 parserSvc 用于表情包解析）
 	emailSvc := utility.NewEmailService(settingSvc, notificationSvc, parserSvc)
 
-	taskBroker := task.NewBroker(uploadSvc, thumbnailSvc, cleanupSvc, articleRepo, commentRepo, emailSvc, cacheSvc, linkCategoryRepo, linkTagRepo, linkRepo, settingSvc, statService)
+	// 初始化文章历史版本服务（需要在taskBroker之前创建，用于定时清理任务）
+	articleHistorySvc := article_history_service.NewService(articleHistoryRepo, articleRepo, userRepo)
+
+	taskBroker := task.NewBroker(uploadSvc, thumbnailSvc, cleanupSvc, articleRepo, commentRepo, emailSvc, cacheSvc, linkCategoryRepo, linkTagRepo, linkRepo, settingSvc, statService, articleHistorySvc)
 	pageSvc := page_service.NewService(pageRepo)
 
 	// 初始化搜索服务
@@ -379,6 +385,9 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	subscriberHandler := subscriber_handler.NewHandler(subscriberSvc)
 
 	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, pageRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, subscriberSvc, userRepo)
+	// 注入文章历史版本仓储
+	articleSvc.SetHistoryRepo(articleHistoryRepo)
+	// articleHistorySvc 已在 taskBroker 之前创建
 	log.Printf("[DEBUG] 正在初始化 PushooService...")
 	pushooSvc := utility.NewPushooService(settingSvc)
 	log.Printf("[DEBUG] PushooService 初始化完成")
@@ -428,6 +437,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	linkHandler := link_handler.NewHandler(linkSvc)
 	thumbnailHandler := thumbnail_handler.NewThumbnailHandler(taskBroker, metadataSvc, fileSvc, thumbnailSvc, settingSvc)
 	articleHandler := article_handler.NewHandler(articleSvc)
+	articleHistoryHandler := article_history_handler.NewHandler(articleHistorySvc)
 	postTagHandler := post_tag_handler.NewHandler(postTagSvc)
 	postCategoryHandler := post_category_handler.NewHandler(postCategorySvc)
 	docSeriesHandler := doc_series_handler.NewHandler(docSeriesSvc)
@@ -457,6 +467,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		directLinkHandler,
 		thumbnailHandler,
 		articleHandler,
+		articleHistoryHandler,
 		postTagHandler,
 		postCategoryHandler,
 		docSeriesHandler,

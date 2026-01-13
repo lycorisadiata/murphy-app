@@ -2154,6 +2154,29 @@ func HasCommentsWith(preds ...predicate.Comment) predicate.Article {
 	})
 }
 
+// HasHistories applies the HasEdge predicate on the "histories" edge.
+func HasHistories() predicate.Article {
+	return predicate.Article(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, HistoriesTable, HistoriesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasHistoriesWith applies the HasEdge predicate on the "histories" edge with a given conditions (other predicates).
+func HasHistoriesWith(preds ...predicate.ArticleHistory) predicate.Article {
+	return predicate.Article(func(s *sql.Selector) {
+		step := newHistoriesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasDocSeries applies the HasEdge predicate on the "doc_series" edge.
 func HasDocSeries() predicate.Article {
 	return predicate.Article(func(s *sql.Selector) {

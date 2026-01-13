@@ -41,9 +41,10 @@ const (
 	EntityTypeStockItem      uint64 = 15 // 卡密实体的类型标识
 	EntityTypeMembershipPlan uint64 = 16 // 会员套餐实体的类型标识
 	EntityTypeUserMembership uint64 = 17 // 用户会员实体的类型标识
-	EntityTypeSupportTicket  uint64 = 18 // 工单实体的类型标识
-	EntityTypeTicketMessage  uint64 = 19 // 工单消息实体的类型标识
-	EntityTypeNotification   uint64 = 20 // 通知实体的类型标识
+	EntityTypeSupportTicket   uint64 = 18 // 工单实体的类型标识
+	EntityTypeTicketMessage   uint64 = 19 // 工单消息实体的类型标识
+	EntityTypeNotification    uint64 = 20 // 通知实体的类型标识
+	EntityTypeArticleHistory  uint64 = 21 // 文章历史版本实体的类型标识
 )
 
 // GenerateRandomSeed 生成一个随机的 16 字节种子（返回 32 字符的十六进制字符串）

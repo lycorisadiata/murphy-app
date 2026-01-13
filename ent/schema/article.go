@@ -175,6 +175,7 @@ func (Article) Edges() []ent.Edge {
 		edge.To("post_tags", PostTag.Type),
 		edge.To("post_categories", PostCategory.Type),
 		edge.To("comments", Comment.Type),
+		edge.To("histories", ArticleHistory.Type),
 		edge.From("doc_series", DocSeries.Type).
 			Ref("articles").
 			Field("doc_series_id").

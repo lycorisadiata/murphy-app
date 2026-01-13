@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
 	"github.com/anzhiyu-c/anheyu-app/ent/postcategory"
@@ -824,6 +825,21 @@ func (_u *ArticleUpdate) AddComments(v ...*Comment) *ArticleUpdate {
 	return _u.AddCommentIDs(ids...)
 }
 
+// AddHistoryIDs adds the "histories" edge to the ArticleHistory entity by IDs.
+func (_u *ArticleUpdate) AddHistoryIDs(ids ...uint) *ArticleUpdate {
+	_u.mutation.AddHistoryIDs(ids...)
+	return _u
+}
+
+// AddHistories adds the "histories" edges to the ArticleHistory entity.
+func (_u *ArticleUpdate) AddHistories(v ...*ArticleHistory) *ArticleUpdate {
+	ids := make([]uint, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddHistoryIDs(ids...)
+}
+
 // SetDocSeries sets the "doc_series" edge to the DocSeries entity.
 func (_u *ArticleUpdate) SetDocSeries(v *DocSeries) *ArticleUpdate {
 	return _u.SetDocSeriesID(v.ID)
@@ -895,6 +911,27 @@ func (_u *ArticleUpdate) RemoveComments(v ...*Comment) *ArticleUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveCommentIDs(ids...)
+}
+
+// ClearHistories clears all "histories" edges to the ArticleHistory entity.
+func (_u *ArticleUpdate) ClearHistories() *ArticleUpdate {
+	_u.mutation.ClearHistories()
+	return _u
+}
+
+// RemoveHistoryIDs removes the "histories" edge to ArticleHistory entities by IDs.
+func (_u *ArticleUpdate) RemoveHistoryIDs(ids ...uint) *ArticleUpdate {
+	_u.mutation.RemoveHistoryIDs(ids...)
+	return _u
+}
+
+// RemoveHistories removes "histories" edges to ArticleHistory entities.
+func (_u *ArticleUpdate) RemoveHistories(v ...*ArticleHistory) *ArticleUpdate {
+	ids := make([]uint, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveHistoryIDs(ids...)
 }
 
 // ClearDocSeries clears the "doc_series" edge to the DocSeries entity.
@@ -1338,6 +1375,51 @@ func (_u *ArticleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(comment.FieldID, field.TypeUint),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.HistoriesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedHistoriesIDs(); len(nodes) > 0 && !_u.mutation.HistoriesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.HistoriesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
 			},
 		}
 		for _, k := range nodes {
@@ -2186,6 +2268,21 @@ func (_u *ArticleUpdateOne) AddComments(v ...*Comment) *ArticleUpdateOne {
 	return _u.AddCommentIDs(ids...)
 }
 
+// AddHistoryIDs adds the "histories" edge to the ArticleHistory entity by IDs.
+func (_u *ArticleUpdateOne) AddHistoryIDs(ids ...uint) *ArticleUpdateOne {
+	_u.mutation.AddHistoryIDs(ids...)
+	return _u
+}
+
+// AddHistories adds the "histories" edges to the ArticleHistory entity.
+func (_u *ArticleUpdateOne) AddHistories(v ...*ArticleHistory) *ArticleUpdateOne {
+	ids := make([]uint, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddHistoryIDs(ids...)
+}
+
 // SetDocSeries sets the "doc_series" edge to the DocSeries entity.
 func (_u *ArticleUpdateOne) SetDocSeries(v *DocSeries) *ArticleUpdateOne {
 	return _u.SetDocSeriesID(v.ID)
@@ -2257,6 +2354,27 @@ func (_u *ArticleUpdateOne) RemoveComments(v ...*Comment) *ArticleUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveCommentIDs(ids...)
+}
+
+// ClearHistories clears all "histories" edges to the ArticleHistory entity.
+func (_u *ArticleUpdateOne) ClearHistories() *ArticleUpdateOne {
+	_u.mutation.ClearHistories()
+	return _u
+}
+
+// RemoveHistoryIDs removes the "histories" edge to ArticleHistory entities by IDs.
+func (_u *ArticleUpdateOne) RemoveHistoryIDs(ids ...uint) *ArticleUpdateOne {
+	_u.mutation.RemoveHistoryIDs(ids...)
+	return _u
+}
+
+// RemoveHistories removes "histories" edges to ArticleHistory entities.
+func (_u *ArticleUpdateOne) RemoveHistories(v ...*ArticleHistory) *ArticleUpdateOne {
+	ids := make([]uint, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveHistoryIDs(ids...)
 }
 
 // ClearDocSeries clears the "doc_series" edge to the DocSeries entity.
@@ -2730,6 +2848,51 @@ func (_u *ArticleUpdateOne) sqlSave(ctx context.Context) (_node *Article, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(comment.FieldID, field.TypeUint),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.HistoriesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedHistoriesIDs(); len(nodes) > 0 && !_u.mutation.HistoriesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.HistoriesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   article.HistoriesTable,
+			Columns: []string{article.HistoriesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(articlehistory.FieldID, field.TypeUint),
 			},
 		}
 		for _, k := range nodes {

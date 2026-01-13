@@ -91,7 +91,9 @@ func (r *entVisitorLogRepository) GetByVisitorID(ctx context.Context, visitorID 
 }
 
 func (r *entVisitorLogRepository) CountUniqueVisitors(ctx context.Context, date time.Time) (int64, error) {
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	// 使用本地时区来匹配数据库中存储的时间（数据库使用服务器本地时间）
+	loc := time.Local
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
 	endOfDay := startOfDay.AddDate(0, 0, 1)
 	visitorIDs, err := r.client.VisitorLog.
 		Query().
@@ -110,7 +112,9 @@ func (r *entVisitorLogRepository) CountUniqueVisitors(ctx context.Context, date 
 }
 
 func (r *entVisitorLogRepository) CountTotalViews(ctx context.Context, date time.Time) (int64, error) {
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	// 使用本地时区来匹配数据库中存储的时间（数据库使用服务器本地时间）
+	loc := time.Local
+	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
 	endOfDay := startOfDay.AddDate(0, 0, 1).Add(-time.Nanosecond)
 
 	count, err := r.client.VisitorLog.Query().

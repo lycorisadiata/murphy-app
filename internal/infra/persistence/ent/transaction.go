@@ -51,21 +51,22 @@ func (tm *entTransactionManager) Do(ctx context.Context, fn func(repos repositor
 	}()
 
 	repos := repository.Repositories{
-		File:          NewEntFileRepository(tx.Client(), tm.db, tm.dbType),
-		Entity:        NewEntEntityRepository(tx.Client()),
-		FileEntity:    NewEntFileEntityRepository(tx.Client()),
-		Metadata:      NewEntMetadataRepository(tx.Client()),
-		StoragePolicy: NewEntStoragePolicyRepository(tx.Client()),
-		DirectLink:    NewEntDirectLinkRepository(tx.Client()),
-		User:          NewEntUserRepository(tx.Client()),
-		UserGroup:     NewEntUserGroupRepository(tx.Client()),
-		Article:       NewArticleRepo(tx.Client(), tm.dbType),
-		PostTag:       NewPostTagRepo(tx.Client(), tm.dbType),
-		PostCategory:  NewPostCategoryRepo(tx.Client()),
-		DocSeries:     NewDocSeriesRepo(tx.Client()),
-		Link:          NewLinkRepo(tx.Client(), tm.dbType),
-		LinkCategory:  NewLinkCategoryRepo(tx.Client()),
-		LinkTag:       NewLinkTagRepo(tx.Client()),
+		File:           NewEntFileRepository(tx.Client(), tm.db, tm.dbType),
+		Entity:         NewEntEntityRepository(tx.Client()),
+		FileEntity:     NewEntFileEntityRepository(tx.Client()),
+		Metadata:       NewEntMetadataRepository(tx.Client()),
+		StoragePolicy:  NewEntStoragePolicyRepository(tx.Client()),
+		DirectLink:     NewEntDirectLinkRepository(tx.Client()),
+		User:           NewEntUserRepository(tx.Client()),
+		UserGroup:      NewEntUserGroupRepository(tx.Client()),
+		Article:        NewArticleRepo(tx.Client(), tm.dbType),
+		ArticleHistory: NewArticleHistoryRepo(tx.Client()),
+		PostTag:        NewPostTagRepo(tx.Client(), tm.dbType),
+		PostCategory:   NewPostCategoryRepo(tx.Client()),
+		DocSeries:      NewDocSeriesRepo(tx.Client()),
+		Link:           NewLinkRepo(tx.Client(), tm.dbType),
+		LinkCategory:   NewLinkCategoryRepo(tx.Client()),
+		LinkTag:        NewLinkTagRepo(tx.Client()),
 	}
 
 	// 执行业务逻辑

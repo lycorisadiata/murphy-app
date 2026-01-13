@@ -11,6 +11,7 @@ import (
 
 	"github.com/anzhiyu-c/anheyu-app/ent"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/repository"
+	article_history_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article_history"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/cleanup"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/file"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
@@ -23,21 +24,22 @@ import (
 
 // Broker 是整个后台任务模块的核心协调者。
 type Broker struct {
-	cron             *cron.Cron
-	logger           *slog.Logger
-	uploadSvc        file.IUploadService
-	thumbnailSvc     *thumbnail.ThumbnailService
-	cleanupSvc       cleanup.ICleanupService
-	jobQueue         chan Job
-	articleRepo      repository.ArticleRepository // 保留，用于其他任务
-	commentRepo      repository.CommentRepository
-	emailSvc         utility.EmailService
-	cacheSvc         utility.CacheService
-	linkCategoryRepo repository.LinkCategoryRepository
-	linkTagRepo      repository.LinkTagRepository
-	linkRepo         repository.LinkRepository
-	settingSvc       setting.SettingService
-	statService      statistics.VisitorStatService
+	cron              *cron.Cron
+	logger            *slog.Logger
+	uploadSvc         file.IUploadService
+	thumbnailSvc      *thumbnail.ThumbnailService
+	cleanupSvc        cleanup.ICleanupService
+	jobQueue          chan Job
+	articleRepo       repository.ArticleRepository // 保留，用于其他任务
+	commentRepo       repository.CommentRepository
+	emailSvc          utility.EmailService
+	cacheSvc          utility.CacheService
+	linkCategoryRepo  repository.LinkCategoryRepository
+	linkTagRepo       repository.LinkTagRepository
+	linkRepo          repository.LinkRepository
+	settingSvc        setting.SettingService
+	statService       statistics.VisitorStatService
+	articleHistorySvc article_history_service.Service
 }
 
 // NewBroker 是 Broker 的构造函数。
@@ -54,6 +56,7 @@ func NewBroker(
 	linkRepo repository.LinkRepository,
 	settingSvc setting.SettingService,
 	statService statistics.VisitorStatService,
+	articleHistorySvc article_history_service.Service,
 ) *Broker {
 
 	slogHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
@@ -71,21 +74,22 @@ func NewBroker(
 	jobQueue := make(chan Job, 1000)
 
 	broker := &Broker{
-		cron:             c,
-		logger:           logger,
-		uploadSvc:        uploadSvc,
-		thumbnailSvc:     thumbnailSvc,
-		cleanupSvc:       cleanupSvc,
-		jobQueue:         jobQueue,
-		articleRepo:      articleRepo,
-		commentRepo:      commentRepo,
-		emailSvc:         emailSvc,
-		cacheSvc:         cacheSvc,
-		linkCategoryRepo: linkCategoryRepo,
-		linkTagRepo:      linkTagRepo,
-		linkRepo:         linkRepo,
-		settingSvc:       settingSvc,
-		statService:      statService,
+		cron:              c,
+		logger:            logger,
+		uploadSvc:         uploadSvc,
+		thumbnailSvc:      thumbnailSvc,
+		cleanupSvc:        cleanupSvc,
+		jobQueue:          jobQueue,
+		articleRepo:       articleRepo,
+		commentRepo:       commentRepo,
+		emailSvc:          emailSvc,
+		cacheSvc:          cacheSvc,
+		linkCategoryRepo:  linkCategoryRepo,
+		linkTagRepo:       linkTagRepo,
+		linkRepo:          linkRepo,
+		settingSvc:        settingSvc,
+		statService:       statService,
+		articleHistorySvc: articleHistorySvc,
 	}
 
 	broker.startWorkerPool()
@@ -181,6 +185,17 @@ func (b *Broker) RegisterCronJobs() {
 	}
 	b.logger.Info("-> Successfully registered 'ScheduledPublishJob'", "schedule", "every minute")
 
+	// 添加文章历史版本清理任务 - 每天凌晨3:30执行
+	if b.articleHistorySvc != nil {
+		articleHistoryCleanupJob := NewArticleHistoryCleanupJob(b.articleHistorySvc)
+		_, err = b.cron.AddJob("0 30 3 * * *", articleHistoryCleanupJob) // 每天凌晨3:30执行
+		if err != nil {
+			b.logger.Error("Failed to add 'ArticleHistoryCleanupJob'", slog.Any("error", err))
+			os.Exit(1)
+		}
+		b.logger.Info("-> Successfully registered 'ArticleHistoryCleanupJob'", "schedule", "every day at 3:30:00 AM")
+	}
+
 	b.logger.Info("All periodic jobs registered.")
 }
 
@@ -270,11 +285,11 @@ func (b *Broker) CheckAndRunMissedAggregation() {
 			startDate = lastDate.AddDate(0, 0, 1)
 		}
 
-		// 3. 循环追补数据直到昨天（使用 UTC 时区确保与查询时一致）
-		nowUTC := time.Now().UTC()
-		today := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC)
-		// 将 startDate 也转换为 UTC 时区
-		startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+		// 3. 循环追补数据直到昨天（使用本地时区，与访问日志记录时间保持一致）
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+		// 将 startDate 也转换为本地时区
+		startDate = time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.Local)
 
 		// 如果起始日期不在今天之前，说明数据已经是最新的，无需追补
 		if !startDate.Before(today) {

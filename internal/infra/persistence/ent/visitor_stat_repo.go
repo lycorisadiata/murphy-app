@@ -69,9 +69,9 @@ func (r *entVisitorStatRepository) CreateOrUpdate(ctx context.Context, stat *ent
 }
 
 func (r *entVisitorStatRepository) GetByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*ent.VisitorStat, error) {
-	// 转换为UTC时区来避免时区问题
-	startOnly := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
-	endOnly := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 999999999, time.UTC)
+	// 使用本地时区来匹配数据库中存储的时间
+	startOnly := time.Date(startDate.Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.Local)
+	endOnly := time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 999999999, time.Local)
 
 	return r.client.VisitorStat.Query().
 		Where(
@@ -90,12 +90,12 @@ func (r *entVisitorStatRepository) GetRecentDays(ctx context.Context, days int) 
 }
 
 func (r *entVisitorStatRepository) GetBasicStatistics(ctx context.Context) (*model.VisitorStatistics, error) {
-	// 使用UTC时区来避免时区问题
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	// 使用本地时区来匹配数据库中存储的时间（数据库使用服务器本地时间）
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	yesterday := today.AddDate(0, 0, -1)
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.Local)
 
 	stats := &model.VisitorStatistics{}
 

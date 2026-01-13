@@ -66,6 +66,9 @@ type Service interface {
 	ImportArticles(ctx context.Context, req *ImportArticleRequest) (*ImportResult, error)
 	ImportArticlesFromJSON(ctx context.Context, jsonData []byte, req *ImportArticleRequest) (*ImportResult, error)
 	ImportArticlesFromZip(ctx context.Context, zipData []byte, req *ImportArticleRequest) (*ImportResult, error)
+
+	// SetHistoryRepo 设置文章历史版本仓储（可选注入，用于文章发布时自动记录历史版本）
+	SetHistoryRepo(historyRepo repository.ArticleHistoryRepository)
 }
 
 type serviceImpl struct {
@@ -89,7 +92,8 @@ type serviceImpl struct {
 	cdnSvc           cdn.CDNService
 	subscriberSvc    *subscriber.Service
 
-	userRepo repository.UserRepository
+	userRepo    repository.UserRepository
+	historyRepo repository.ArticleHistoryRepository // 文章历史版本仓储
 }
 
 func NewService(
@@ -135,6 +139,78 @@ func NewService(
 		subscriberSvc:    subscriberSvc,
 		userRepo:         userRepo,
 	}
+}
+
+// SetHistoryRepo 设置文章历史版本仓储（可选注入）
+func (s *serviceImpl) SetHistoryRepo(historyRepo repository.ArticleHistoryRepository) {
+	s.historyRepo = historyRepo
+}
+
+// createArticleHistory 创建文章历史版本（内部方法）
+func (s *serviceImpl) createArticleHistory(ctx context.Context, article *model.Article, editorID uint, changeNote string) {
+	if s.historyRepo == nil {
+		return // 历史版本功能未启用
+	}
+
+	// 获取编辑者昵称
+	editorNickname := "未知用户"
+	if s.userRepo != nil && editorID > 0 {
+		user, err := s.userRepo.FindByID(ctx, editorID)
+		if err == nil && user != nil {
+			editorNickname = user.Nickname
+		}
+	}
+
+	// 异步创建历史版本，不影响主流程
+	go func() {
+		bgCtx := context.Background()
+
+		// 获取最新版本号
+		articleDBID, _, err := idgen.DecodePublicID(article.ID)
+		if err != nil {
+			log.Printf("[createArticleHistory] 解码文章ID失败: %v", err)
+			return
+		}
+
+		latestVersion, err := s.historyRepo.GetLatestVersion(bgCtx, articleDBID)
+		if err != nil {
+			log.Printf("[createArticleHistory] 获取最新版本号失败: %v", err)
+			return
+		}
+		newVersion := latestVersion + 1
+
+		// 创建历史记录
+		params := &model.CreateArticleHistoryParams{
+			ArticleDBID:    articleDBID,
+			Version:        newVersion,
+			Title:          article.Title,
+			ContentMd:      article.ContentMd,
+			ContentHTML:    article.ContentHTML,
+			CoverURL:       article.CoverURL,
+			TopImgURL:      article.TopImgURL,
+			PrimaryColor:   article.PrimaryColor,
+			Summaries:      article.Summaries,
+			WordCount:      article.WordCount,
+			Keywords:       article.Keywords,
+			EditorID:       editorID,
+			EditorNickname: editorNickname,
+			ChangeNote:     changeNote,
+		}
+
+		_, err = s.historyRepo.Create(bgCtx, params)
+		if err != nil {
+			log.Printf("[createArticleHistory] 创建历史版本失败: %v", err)
+			return
+		}
+
+		log.Printf("[createArticleHistory] 创建历史版本成功: 文章=%s, 版本=%d", article.ID, newVersion)
+
+		// 清理旧版本（保留最近10个）
+		const maxVersions = 10
+		if cleanErr := s.historyRepo.DeleteOldVersions(bgCtx, articleDBID, maxVersions); cleanErr != nil {
+			log.Printf("[createArticleHistory] 清理旧版本失败: %v", cleanErr)
+		}
+	}()
 }
 
 // UploadArticleImage 处理文章图片的上传，并为其创建直链。
@@ -970,6 +1046,9 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 		if err := s.subscriberSvc.NotifyArticlePublished(ctx, newArticle); err != nil {
 			log.Printf("[Create] 触发订阅通知失败: %v", err)
 		}
+
+		// 创建历史版本记录（仅在发布时记录）
+		s.createArticleHistory(ctx, newArticle, req.OwnerID, "初次发布")
 	}
 
 	resp := s.ToAPIResponse(newArticle, false, false)
@@ -1314,6 +1393,15 @@ func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.Up
 		}
 	}
 
+	// 创建历史版本记录（仅在发布状态时记录）
+	if updatedArticle.Status == "PUBLISHED" {
+		changeNote := "更新发布"
+		if oldStatus != "PUBLISHED" {
+			changeNote = "首次发布"
+		}
+		s.createArticleHistory(ctx, updatedArticle, updatedArticle.OwnerID, changeNote)
+	}
+
 	resp := s.ToAPIResponse(updatedArticle, false, false)
 	s.fillOwnerNickname(ctx, resp, nil)
 	return resp, nil
@@ -1388,6 +1476,23 @@ func (s *serviceImpl) Delete(ctx context.Context, publicID string) error {
 			log.Printf("[警告] 删除搜索索引失败: %v", err)
 		}
 	}()
+
+	// 异步删除文章历史版本记录
+	if s.historyRepo != nil {
+		go func() {
+			bgCtx := context.Background()
+			articleDBID, _, err := idgen.DecodePublicID(publicID)
+			if err != nil {
+				log.Printf("[警告] 解码文章ID失败，无法清理历史版本: %v", err)
+				return
+			}
+			if err := s.historyRepo.DeleteByArticle(bgCtx, articleDBID); err != nil {
+				log.Printf("[警告] 删除文章历史版本记录失败: %v", err)
+			} else {
+				log.Printf("[信息] 已清理文章 %s 的历史版本记录", publicID)
+			}
+		}()
+	}
 
 	return nil
 }

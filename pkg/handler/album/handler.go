@@ -402,7 +402,7 @@ func (h *AlbumHandler) BatchImportAlbums(c *gin.Context) {
 
 // ExportAlbums 处理导出相册的请求
 // @Summary      导出相册
-// @Description  导出选定的相册数据，支持 JSON 和 ZIP 格式
+// @Description  导出选定的相册数据，支持 JSON 和 ZIP 格式。如果不指定 album_ids，则导出所有相册
 // @Tags         相册管理
 // @Security     BearerAuth
 // @Accept       json
@@ -414,13 +414,36 @@ func (h *AlbumHandler) BatchImportAlbums(c *gin.Context) {
 // @Router       /albums/export [post]
 func (h *AlbumHandler) ExportAlbums(c *gin.Context) {
 	var req struct {
-		AlbumIDs []uint `json:"album_ids" binding:"required"`
+		AlbumIDs []uint `json:"album_ids"` // 移除 required，支持导出所有
 		Format   string `json:"format"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "参数错误: "+err.Error())
 		return
+	}
+
+	// 如果没有指定 album_ids，则获取所有相册的 ID
+	if len(req.AlbumIDs) == 0 {
+		// 查询所有相册（使用大页面获取所有记录）
+		result, err := h.albumSvc.FindAlbums(c.Request.Context(), album.FindAlbumsParams{
+			Page:     1,
+			PageSize: 100000, // 足够大的值获取所有记录
+		})
+		if err != nil {
+			log.Printf("获取所有相册失败: %v", err)
+			response.Fail(c, http.StatusInternalServerError, "获取相册列表失败: "+err.Error())
+			return
+		}
+		// 提取所有相册的 ID
+		for _, a := range result.Items {
+			req.AlbumIDs = append(req.AlbumIDs, a.ID)
+		}
+
+		if len(req.AlbumIDs) == 0 {
+			response.Fail(c, http.StatusBadRequest, "没有可导出的相册")
+			return
+		}
 	}
 
 	// 如果没有指定格式，默认为 JSON

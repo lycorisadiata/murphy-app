@@ -14,6 +14,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/album"
 	"github.com/anzhiyu-c/anheyu-app/ent/albumcategory"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/directlink"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
@@ -55,6 +56,7 @@ const (
 	TypeAlbum                  = "Album"
 	TypeAlbumCategory          = "AlbumCategory"
 	TypeArticle                = "Article"
+	TypeArticleHistory         = "ArticleHistory"
 	TypeComment                = "Comment"
 	TypeDirectLink             = "DirectLink"
 	TypeDocSeries              = "DocSeries"
@@ -2677,6 +2679,9 @@ type ArticleMutation struct {
 	comments                map[uint]struct{}
 	removedcomments         map[uint]struct{}
 	clearedcomments         bool
+	histories               map[uint]struct{}
+	removedhistories        map[uint]struct{}
+	clearedhistories        bool
 	doc_series              *uint
 	cleareddoc_series       bool
 	done                    bool
@@ -4874,6 +4879,60 @@ func (m *ArticleMutation) ResetComments() {
 	m.removedcomments = nil
 }
 
+// AddHistoryIDs adds the "histories" edge to the ArticleHistory entity by ids.
+func (m *ArticleMutation) AddHistoryIDs(ids ...uint) {
+	if m.histories == nil {
+		m.histories = make(map[uint]struct{})
+	}
+	for i := range ids {
+		m.histories[ids[i]] = struct{}{}
+	}
+}
+
+// ClearHistories clears the "histories" edge to the ArticleHistory entity.
+func (m *ArticleMutation) ClearHistories() {
+	m.clearedhistories = true
+}
+
+// HistoriesCleared reports if the "histories" edge to the ArticleHistory entity was cleared.
+func (m *ArticleMutation) HistoriesCleared() bool {
+	return m.clearedhistories
+}
+
+// RemoveHistoryIDs removes the "histories" edge to the ArticleHistory entity by IDs.
+func (m *ArticleMutation) RemoveHistoryIDs(ids ...uint) {
+	if m.removedhistories == nil {
+		m.removedhistories = make(map[uint]struct{})
+	}
+	for i := range ids {
+		delete(m.histories, ids[i])
+		m.removedhistories[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedHistories returns the removed IDs of the "histories" edge to the ArticleHistory entity.
+func (m *ArticleMutation) RemovedHistoriesIDs() (ids []uint) {
+	for id := range m.removedhistories {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// HistoriesIDs returns the "histories" edge IDs in the mutation.
+func (m *ArticleMutation) HistoriesIDs() (ids []uint) {
+	for id := range m.histories {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetHistories resets all changes to the "histories" edge.
+func (m *ArticleMutation) ResetHistories() {
+	m.histories = nil
+	m.clearedhistories = false
+	m.removedhistories = nil
+}
+
 // ClearDocSeries clears the "doc_series" edge to the DocSeries entity.
 func (m *ArticleMutation) ClearDocSeries() {
 	m.cleareddoc_series = true
@@ -5943,7 +6002,7 @@ func (m *ArticleMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ArticleMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.post_tags != nil {
 		edges = append(edges, article.EdgePostTags)
 	}
@@ -5952,6 +6011,9 @@ func (m *ArticleMutation) AddedEdges() []string {
 	}
 	if m.comments != nil {
 		edges = append(edges, article.EdgeComments)
+	}
+	if m.histories != nil {
+		edges = append(edges, article.EdgeHistories)
 	}
 	if m.doc_series != nil {
 		edges = append(edges, article.EdgeDocSeries)
@@ -5981,6 +6043,12 @@ func (m *ArticleMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case article.EdgeHistories:
+		ids := make([]ent.Value, 0, len(m.histories))
+		for id := range m.histories {
+			ids = append(ids, id)
+		}
+		return ids
 	case article.EdgeDocSeries:
 		if id := m.doc_series; id != nil {
 			return []ent.Value{*id}
@@ -5991,7 +6059,7 @@ func (m *ArticleMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ArticleMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedpost_tags != nil {
 		edges = append(edges, article.EdgePostTags)
 	}
@@ -6000,6 +6068,9 @@ func (m *ArticleMutation) RemovedEdges() []string {
 	}
 	if m.removedcomments != nil {
 		edges = append(edges, article.EdgeComments)
+	}
+	if m.removedhistories != nil {
+		edges = append(edges, article.EdgeHistories)
 	}
 	return edges
 }
@@ -6026,13 +6097,19 @@ func (m *ArticleMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case article.EdgeHistories:
+		ids := make([]ent.Value, 0, len(m.removedhistories))
+		for id := range m.removedhistories {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ArticleMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedpost_tags {
 		edges = append(edges, article.EdgePostTags)
 	}
@@ -6041,6 +6118,9 @@ func (m *ArticleMutation) ClearedEdges() []string {
 	}
 	if m.clearedcomments {
 		edges = append(edges, article.EdgeComments)
+	}
+	if m.clearedhistories {
+		edges = append(edges, article.EdgeHistories)
 	}
 	if m.cleareddoc_series {
 		edges = append(edges, article.EdgeDocSeries)
@@ -6058,6 +6138,8 @@ func (m *ArticleMutation) EdgeCleared(name string) bool {
 		return m.clearedpost_categories
 	case article.EdgeComments:
 		return m.clearedcomments
+	case article.EdgeHistories:
+		return m.clearedhistories
 	case article.EdgeDocSeries:
 		return m.cleareddoc_series
 	}
@@ -6088,11 +6170,1522 @@ func (m *ArticleMutation) ResetEdge(name string) error {
 	case article.EdgeComments:
 		m.ResetComments()
 		return nil
+	case article.EdgeHistories:
+		m.ResetHistories()
+		return nil
 	case article.EdgeDocSeries:
 		m.ResetDocSeries()
 		return nil
 	}
 	return fmt.Errorf("unknown Article edge %s", name)
+}
+
+// ArticleHistoryMutation represents an operation that mutates the ArticleHistory nodes in the graph.
+type ArticleHistoryMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uint
+	version         *int
+	addversion      *int
+	title           *string
+	content_md      *string
+	content_html    *string
+	cover_url       *string
+	top_img_url     *string
+	primary_color   *string
+	summaries       *[]string
+	appendsummaries []string
+	word_count      *int
+	addword_count   *int
+	keywords        *string
+	editor_id       *uint
+	addeditor_id    *int
+	editor_nickname *string
+	change_note     *string
+	created_at      *time.Time
+	extra_data      *map[string]interface{}
+	clearedFields   map[string]struct{}
+	article         *uint
+	clearedarticle  bool
+	done            bool
+	oldValue        func(context.Context) (*ArticleHistory, error)
+	predicates      []predicate.ArticleHistory
+}
+
+var _ ent.Mutation = (*ArticleHistoryMutation)(nil)
+
+// articlehistoryOption allows management of the mutation configuration using functional options.
+type articlehistoryOption func(*ArticleHistoryMutation)
+
+// newArticleHistoryMutation creates new mutation for the ArticleHistory entity.
+func newArticleHistoryMutation(c config, op Op, opts ...articlehistoryOption) *ArticleHistoryMutation {
+	m := &ArticleHistoryMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeArticleHistory,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withArticleHistoryID sets the ID field of the mutation.
+func withArticleHistoryID(id uint) articlehistoryOption {
+	return func(m *ArticleHistoryMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ArticleHistory
+		)
+		m.oldValue = func(ctx context.Context) (*ArticleHistory, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ArticleHistory.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withArticleHistory sets the old ArticleHistory of the mutation.
+func withArticleHistory(node *ArticleHistory) articlehistoryOption {
+	return func(m *ArticleHistoryMutation) {
+		m.oldValue = func(context.Context) (*ArticleHistory, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ArticleHistoryMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ArticleHistoryMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of ArticleHistory entities.
+func (m *ArticleHistoryMutation) SetID(id uint) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ArticleHistoryMutation) ID() (id uint, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ArticleHistoryMutation) IDs(ctx context.Context) ([]uint, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uint{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ArticleHistory.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetArticleID sets the "article_id" field.
+func (m *ArticleHistoryMutation) SetArticleID(u uint) {
+	m.article = &u
+}
+
+// ArticleID returns the value of the "article_id" field in the mutation.
+func (m *ArticleHistoryMutation) ArticleID() (r uint, exists bool) {
+	v := m.article
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldArticleID returns the old "article_id" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldArticleID(ctx context.Context) (v uint, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldArticleID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldArticleID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldArticleID: %w", err)
+	}
+	return oldValue.ArticleID, nil
+}
+
+// ResetArticleID resets all changes to the "article_id" field.
+func (m *ArticleHistoryMutation) ResetArticleID() {
+	m.article = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *ArticleHistoryMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *ArticleHistoryMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *ArticleHistoryMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *ArticleHistoryMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *ArticleHistoryMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetTitle sets the "title" field.
+func (m *ArticleHistoryMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *ArticleHistoryMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *ArticleHistoryMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetContentMd sets the "content_md" field.
+func (m *ArticleHistoryMutation) SetContentMd(s string) {
+	m.content_md = &s
+}
+
+// ContentMd returns the value of the "content_md" field in the mutation.
+func (m *ArticleHistoryMutation) ContentMd() (r string, exists bool) {
+	v := m.content_md
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentMd returns the old "content_md" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldContentMd(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentMd is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentMd requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentMd: %w", err)
+	}
+	return oldValue.ContentMd, nil
+}
+
+// ClearContentMd clears the value of the "content_md" field.
+func (m *ArticleHistoryMutation) ClearContentMd() {
+	m.content_md = nil
+	m.clearedFields[articlehistory.FieldContentMd] = struct{}{}
+}
+
+// ContentMdCleared returns if the "content_md" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) ContentMdCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldContentMd]
+	return ok
+}
+
+// ResetContentMd resets all changes to the "content_md" field.
+func (m *ArticleHistoryMutation) ResetContentMd() {
+	m.content_md = nil
+	delete(m.clearedFields, articlehistory.FieldContentMd)
+}
+
+// SetContentHTML sets the "content_html" field.
+func (m *ArticleHistoryMutation) SetContentHTML(s string) {
+	m.content_html = &s
+}
+
+// ContentHTML returns the value of the "content_html" field in the mutation.
+func (m *ArticleHistoryMutation) ContentHTML() (r string, exists bool) {
+	v := m.content_html
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentHTML returns the old "content_html" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldContentHTML(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentHTML is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentHTML requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentHTML: %w", err)
+	}
+	return oldValue.ContentHTML, nil
+}
+
+// ClearContentHTML clears the value of the "content_html" field.
+func (m *ArticleHistoryMutation) ClearContentHTML() {
+	m.content_html = nil
+	m.clearedFields[articlehistory.FieldContentHTML] = struct{}{}
+}
+
+// ContentHTMLCleared returns if the "content_html" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) ContentHTMLCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldContentHTML]
+	return ok
+}
+
+// ResetContentHTML resets all changes to the "content_html" field.
+func (m *ArticleHistoryMutation) ResetContentHTML() {
+	m.content_html = nil
+	delete(m.clearedFields, articlehistory.FieldContentHTML)
+}
+
+// SetCoverURL sets the "cover_url" field.
+func (m *ArticleHistoryMutation) SetCoverURL(s string) {
+	m.cover_url = &s
+}
+
+// CoverURL returns the value of the "cover_url" field in the mutation.
+func (m *ArticleHistoryMutation) CoverURL() (r string, exists bool) {
+	v := m.cover_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoverURL returns the old "cover_url" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldCoverURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoverURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoverURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoverURL: %w", err)
+	}
+	return oldValue.CoverURL, nil
+}
+
+// ClearCoverURL clears the value of the "cover_url" field.
+func (m *ArticleHistoryMutation) ClearCoverURL() {
+	m.cover_url = nil
+	m.clearedFields[articlehistory.FieldCoverURL] = struct{}{}
+}
+
+// CoverURLCleared returns if the "cover_url" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) CoverURLCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldCoverURL]
+	return ok
+}
+
+// ResetCoverURL resets all changes to the "cover_url" field.
+func (m *ArticleHistoryMutation) ResetCoverURL() {
+	m.cover_url = nil
+	delete(m.clearedFields, articlehistory.FieldCoverURL)
+}
+
+// SetTopImgURL sets the "top_img_url" field.
+func (m *ArticleHistoryMutation) SetTopImgURL(s string) {
+	m.top_img_url = &s
+}
+
+// TopImgURL returns the value of the "top_img_url" field in the mutation.
+func (m *ArticleHistoryMutation) TopImgURL() (r string, exists bool) {
+	v := m.top_img_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTopImgURL returns the old "top_img_url" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldTopImgURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTopImgURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTopImgURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTopImgURL: %w", err)
+	}
+	return oldValue.TopImgURL, nil
+}
+
+// ClearTopImgURL clears the value of the "top_img_url" field.
+func (m *ArticleHistoryMutation) ClearTopImgURL() {
+	m.top_img_url = nil
+	m.clearedFields[articlehistory.FieldTopImgURL] = struct{}{}
+}
+
+// TopImgURLCleared returns if the "top_img_url" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) TopImgURLCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldTopImgURL]
+	return ok
+}
+
+// ResetTopImgURL resets all changes to the "top_img_url" field.
+func (m *ArticleHistoryMutation) ResetTopImgURL() {
+	m.top_img_url = nil
+	delete(m.clearedFields, articlehistory.FieldTopImgURL)
+}
+
+// SetPrimaryColor sets the "primary_color" field.
+func (m *ArticleHistoryMutation) SetPrimaryColor(s string) {
+	m.primary_color = &s
+}
+
+// PrimaryColor returns the value of the "primary_color" field in the mutation.
+func (m *ArticleHistoryMutation) PrimaryColor() (r string, exists bool) {
+	v := m.primary_color
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrimaryColor returns the old "primary_color" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldPrimaryColor(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrimaryColor is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrimaryColor requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrimaryColor: %w", err)
+	}
+	return oldValue.PrimaryColor, nil
+}
+
+// ClearPrimaryColor clears the value of the "primary_color" field.
+func (m *ArticleHistoryMutation) ClearPrimaryColor() {
+	m.primary_color = nil
+	m.clearedFields[articlehistory.FieldPrimaryColor] = struct{}{}
+}
+
+// PrimaryColorCleared returns if the "primary_color" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) PrimaryColorCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldPrimaryColor]
+	return ok
+}
+
+// ResetPrimaryColor resets all changes to the "primary_color" field.
+func (m *ArticleHistoryMutation) ResetPrimaryColor() {
+	m.primary_color = nil
+	delete(m.clearedFields, articlehistory.FieldPrimaryColor)
+}
+
+// SetSummaries sets the "summaries" field.
+func (m *ArticleHistoryMutation) SetSummaries(s []string) {
+	m.summaries = &s
+	m.appendsummaries = nil
+}
+
+// Summaries returns the value of the "summaries" field in the mutation.
+func (m *ArticleHistoryMutation) Summaries() (r []string, exists bool) {
+	v := m.summaries
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummaries returns the old "summaries" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldSummaries(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummaries is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummaries requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummaries: %w", err)
+	}
+	return oldValue.Summaries, nil
+}
+
+// AppendSummaries adds s to the "summaries" field.
+func (m *ArticleHistoryMutation) AppendSummaries(s []string) {
+	m.appendsummaries = append(m.appendsummaries, s...)
+}
+
+// AppendedSummaries returns the list of values that were appended to the "summaries" field in this mutation.
+func (m *ArticleHistoryMutation) AppendedSummaries() ([]string, bool) {
+	if len(m.appendsummaries) == 0 {
+		return nil, false
+	}
+	return m.appendsummaries, true
+}
+
+// ClearSummaries clears the value of the "summaries" field.
+func (m *ArticleHistoryMutation) ClearSummaries() {
+	m.summaries = nil
+	m.appendsummaries = nil
+	m.clearedFields[articlehistory.FieldSummaries] = struct{}{}
+}
+
+// SummariesCleared returns if the "summaries" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) SummariesCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldSummaries]
+	return ok
+}
+
+// ResetSummaries resets all changes to the "summaries" field.
+func (m *ArticleHistoryMutation) ResetSummaries() {
+	m.summaries = nil
+	m.appendsummaries = nil
+	delete(m.clearedFields, articlehistory.FieldSummaries)
+}
+
+// SetWordCount sets the "word_count" field.
+func (m *ArticleHistoryMutation) SetWordCount(i int) {
+	m.word_count = &i
+	m.addword_count = nil
+}
+
+// WordCount returns the value of the "word_count" field in the mutation.
+func (m *ArticleHistoryMutation) WordCount() (r int, exists bool) {
+	v := m.word_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWordCount returns the old "word_count" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldWordCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWordCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWordCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWordCount: %w", err)
+	}
+	return oldValue.WordCount, nil
+}
+
+// AddWordCount adds i to the "word_count" field.
+func (m *ArticleHistoryMutation) AddWordCount(i int) {
+	if m.addword_count != nil {
+		*m.addword_count += i
+	} else {
+		m.addword_count = &i
+	}
+}
+
+// AddedWordCount returns the value that was added to the "word_count" field in this mutation.
+func (m *ArticleHistoryMutation) AddedWordCount() (r int, exists bool) {
+	v := m.addword_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWordCount resets all changes to the "word_count" field.
+func (m *ArticleHistoryMutation) ResetWordCount() {
+	m.word_count = nil
+	m.addword_count = nil
+}
+
+// SetKeywords sets the "keywords" field.
+func (m *ArticleHistoryMutation) SetKeywords(s string) {
+	m.keywords = &s
+}
+
+// Keywords returns the value of the "keywords" field in the mutation.
+func (m *ArticleHistoryMutation) Keywords() (r string, exists bool) {
+	v := m.keywords
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeywords returns the old "keywords" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldKeywords(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeywords is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeywords requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeywords: %w", err)
+	}
+	return oldValue.Keywords, nil
+}
+
+// ClearKeywords clears the value of the "keywords" field.
+func (m *ArticleHistoryMutation) ClearKeywords() {
+	m.keywords = nil
+	m.clearedFields[articlehistory.FieldKeywords] = struct{}{}
+}
+
+// KeywordsCleared returns if the "keywords" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) KeywordsCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldKeywords]
+	return ok
+}
+
+// ResetKeywords resets all changes to the "keywords" field.
+func (m *ArticleHistoryMutation) ResetKeywords() {
+	m.keywords = nil
+	delete(m.clearedFields, articlehistory.FieldKeywords)
+}
+
+// SetEditorID sets the "editor_id" field.
+func (m *ArticleHistoryMutation) SetEditorID(u uint) {
+	m.editor_id = &u
+	m.addeditor_id = nil
+}
+
+// EditorID returns the value of the "editor_id" field in the mutation.
+func (m *ArticleHistoryMutation) EditorID() (r uint, exists bool) {
+	v := m.editor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEditorID returns the old "editor_id" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldEditorID(ctx context.Context) (v uint, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEditorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEditorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEditorID: %w", err)
+	}
+	return oldValue.EditorID, nil
+}
+
+// AddEditorID adds u to the "editor_id" field.
+func (m *ArticleHistoryMutation) AddEditorID(u int) {
+	if m.addeditor_id != nil {
+		*m.addeditor_id += u
+	} else {
+		m.addeditor_id = &u
+	}
+}
+
+// AddedEditorID returns the value that was added to the "editor_id" field in this mutation.
+func (m *ArticleHistoryMutation) AddedEditorID() (r int, exists bool) {
+	v := m.addeditor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetEditorID resets all changes to the "editor_id" field.
+func (m *ArticleHistoryMutation) ResetEditorID() {
+	m.editor_id = nil
+	m.addeditor_id = nil
+}
+
+// SetEditorNickname sets the "editor_nickname" field.
+func (m *ArticleHistoryMutation) SetEditorNickname(s string) {
+	m.editor_nickname = &s
+}
+
+// EditorNickname returns the value of the "editor_nickname" field in the mutation.
+func (m *ArticleHistoryMutation) EditorNickname() (r string, exists bool) {
+	v := m.editor_nickname
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEditorNickname returns the old "editor_nickname" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldEditorNickname(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEditorNickname is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEditorNickname requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEditorNickname: %w", err)
+	}
+	return oldValue.EditorNickname, nil
+}
+
+// ClearEditorNickname clears the value of the "editor_nickname" field.
+func (m *ArticleHistoryMutation) ClearEditorNickname() {
+	m.editor_nickname = nil
+	m.clearedFields[articlehistory.FieldEditorNickname] = struct{}{}
+}
+
+// EditorNicknameCleared returns if the "editor_nickname" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) EditorNicknameCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldEditorNickname]
+	return ok
+}
+
+// ResetEditorNickname resets all changes to the "editor_nickname" field.
+func (m *ArticleHistoryMutation) ResetEditorNickname() {
+	m.editor_nickname = nil
+	delete(m.clearedFields, articlehistory.FieldEditorNickname)
+}
+
+// SetChangeNote sets the "change_note" field.
+func (m *ArticleHistoryMutation) SetChangeNote(s string) {
+	m.change_note = &s
+}
+
+// ChangeNote returns the value of the "change_note" field in the mutation.
+func (m *ArticleHistoryMutation) ChangeNote() (r string, exists bool) {
+	v := m.change_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChangeNote returns the old "change_note" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldChangeNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChangeNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChangeNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChangeNote: %w", err)
+	}
+	return oldValue.ChangeNote, nil
+}
+
+// ClearChangeNote clears the value of the "change_note" field.
+func (m *ArticleHistoryMutation) ClearChangeNote() {
+	m.change_note = nil
+	m.clearedFields[articlehistory.FieldChangeNote] = struct{}{}
+}
+
+// ChangeNoteCleared returns if the "change_note" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) ChangeNoteCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldChangeNote]
+	return ok
+}
+
+// ResetChangeNote resets all changes to the "change_note" field.
+func (m *ArticleHistoryMutation) ResetChangeNote() {
+	m.change_note = nil
+	delete(m.clearedFields, articlehistory.FieldChangeNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ArticleHistoryMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ArticleHistoryMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ArticleHistoryMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetExtraData sets the "extra_data" field.
+func (m *ArticleHistoryMutation) SetExtraData(value map[string]interface{}) {
+	m.extra_data = &value
+}
+
+// ExtraData returns the value of the "extra_data" field in the mutation.
+func (m *ArticleHistoryMutation) ExtraData() (r map[string]interface{}, exists bool) {
+	v := m.extra_data
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExtraData returns the old "extra_data" field's value of the ArticleHistory entity.
+// If the ArticleHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleHistoryMutation) OldExtraData(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExtraData is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExtraData requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExtraData: %w", err)
+	}
+	return oldValue.ExtraData, nil
+}
+
+// ClearExtraData clears the value of the "extra_data" field.
+func (m *ArticleHistoryMutation) ClearExtraData() {
+	m.extra_data = nil
+	m.clearedFields[articlehistory.FieldExtraData] = struct{}{}
+}
+
+// ExtraDataCleared returns if the "extra_data" field was cleared in this mutation.
+func (m *ArticleHistoryMutation) ExtraDataCleared() bool {
+	_, ok := m.clearedFields[articlehistory.FieldExtraData]
+	return ok
+}
+
+// ResetExtraData resets all changes to the "extra_data" field.
+func (m *ArticleHistoryMutation) ResetExtraData() {
+	m.extra_data = nil
+	delete(m.clearedFields, articlehistory.FieldExtraData)
+}
+
+// ClearArticle clears the "article" edge to the Article entity.
+func (m *ArticleHistoryMutation) ClearArticle() {
+	m.clearedarticle = true
+	m.clearedFields[articlehistory.FieldArticleID] = struct{}{}
+}
+
+// ArticleCleared reports if the "article" edge to the Article entity was cleared.
+func (m *ArticleHistoryMutation) ArticleCleared() bool {
+	return m.clearedarticle
+}
+
+// ArticleIDs returns the "article" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ArticleID instead. It exists only for internal usage by the builders.
+func (m *ArticleHistoryMutation) ArticleIDs() (ids []uint) {
+	if id := m.article; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetArticle resets all changes to the "article" edge.
+func (m *ArticleHistoryMutation) ResetArticle() {
+	m.article = nil
+	m.clearedarticle = false
+}
+
+// Where appends a list predicates to the ArticleHistoryMutation builder.
+func (m *ArticleHistoryMutation) Where(ps ...predicate.ArticleHistory) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ArticleHistoryMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ArticleHistoryMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ArticleHistory, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ArticleHistoryMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ArticleHistoryMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ArticleHistory).
+func (m *ArticleHistoryMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ArticleHistoryMutation) Fields() []string {
+	fields := make([]string, 0, 16)
+	if m.article != nil {
+		fields = append(fields, articlehistory.FieldArticleID)
+	}
+	if m.version != nil {
+		fields = append(fields, articlehistory.FieldVersion)
+	}
+	if m.title != nil {
+		fields = append(fields, articlehistory.FieldTitle)
+	}
+	if m.content_md != nil {
+		fields = append(fields, articlehistory.FieldContentMd)
+	}
+	if m.content_html != nil {
+		fields = append(fields, articlehistory.FieldContentHTML)
+	}
+	if m.cover_url != nil {
+		fields = append(fields, articlehistory.FieldCoverURL)
+	}
+	if m.top_img_url != nil {
+		fields = append(fields, articlehistory.FieldTopImgURL)
+	}
+	if m.primary_color != nil {
+		fields = append(fields, articlehistory.FieldPrimaryColor)
+	}
+	if m.summaries != nil {
+		fields = append(fields, articlehistory.FieldSummaries)
+	}
+	if m.word_count != nil {
+		fields = append(fields, articlehistory.FieldWordCount)
+	}
+	if m.keywords != nil {
+		fields = append(fields, articlehistory.FieldKeywords)
+	}
+	if m.editor_id != nil {
+		fields = append(fields, articlehistory.FieldEditorID)
+	}
+	if m.editor_nickname != nil {
+		fields = append(fields, articlehistory.FieldEditorNickname)
+	}
+	if m.change_note != nil {
+		fields = append(fields, articlehistory.FieldChangeNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, articlehistory.FieldCreatedAt)
+	}
+	if m.extra_data != nil {
+		fields = append(fields, articlehistory.FieldExtraData)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ArticleHistoryMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case articlehistory.FieldArticleID:
+		return m.ArticleID()
+	case articlehistory.FieldVersion:
+		return m.Version()
+	case articlehistory.FieldTitle:
+		return m.Title()
+	case articlehistory.FieldContentMd:
+		return m.ContentMd()
+	case articlehistory.FieldContentHTML:
+		return m.ContentHTML()
+	case articlehistory.FieldCoverURL:
+		return m.CoverURL()
+	case articlehistory.FieldTopImgURL:
+		return m.TopImgURL()
+	case articlehistory.FieldPrimaryColor:
+		return m.PrimaryColor()
+	case articlehistory.FieldSummaries:
+		return m.Summaries()
+	case articlehistory.FieldWordCount:
+		return m.WordCount()
+	case articlehistory.FieldKeywords:
+		return m.Keywords()
+	case articlehistory.FieldEditorID:
+		return m.EditorID()
+	case articlehistory.FieldEditorNickname:
+		return m.EditorNickname()
+	case articlehistory.FieldChangeNote:
+		return m.ChangeNote()
+	case articlehistory.FieldCreatedAt:
+		return m.CreatedAt()
+	case articlehistory.FieldExtraData:
+		return m.ExtraData()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ArticleHistoryMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case articlehistory.FieldArticleID:
+		return m.OldArticleID(ctx)
+	case articlehistory.FieldVersion:
+		return m.OldVersion(ctx)
+	case articlehistory.FieldTitle:
+		return m.OldTitle(ctx)
+	case articlehistory.FieldContentMd:
+		return m.OldContentMd(ctx)
+	case articlehistory.FieldContentHTML:
+		return m.OldContentHTML(ctx)
+	case articlehistory.FieldCoverURL:
+		return m.OldCoverURL(ctx)
+	case articlehistory.FieldTopImgURL:
+		return m.OldTopImgURL(ctx)
+	case articlehistory.FieldPrimaryColor:
+		return m.OldPrimaryColor(ctx)
+	case articlehistory.FieldSummaries:
+		return m.OldSummaries(ctx)
+	case articlehistory.FieldWordCount:
+		return m.OldWordCount(ctx)
+	case articlehistory.FieldKeywords:
+		return m.OldKeywords(ctx)
+	case articlehistory.FieldEditorID:
+		return m.OldEditorID(ctx)
+	case articlehistory.FieldEditorNickname:
+		return m.OldEditorNickname(ctx)
+	case articlehistory.FieldChangeNote:
+		return m.OldChangeNote(ctx)
+	case articlehistory.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case articlehistory.FieldExtraData:
+		return m.OldExtraData(ctx)
+	}
+	return nil, fmt.Errorf("unknown ArticleHistory field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ArticleHistoryMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case articlehistory.FieldArticleID:
+		v, ok := value.(uint)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetArticleID(v)
+		return nil
+	case articlehistory.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case articlehistory.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case articlehistory.FieldContentMd:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentMd(v)
+		return nil
+	case articlehistory.FieldContentHTML:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentHTML(v)
+		return nil
+	case articlehistory.FieldCoverURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoverURL(v)
+		return nil
+	case articlehistory.FieldTopImgURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTopImgURL(v)
+		return nil
+	case articlehistory.FieldPrimaryColor:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrimaryColor(v)
+		return nil
+	case articlehistory.FieldSummaries:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummaries(v)
+		return nil
+	case articlehistory.FieldWordCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWordCount(v)
+		return nil
+	case articlehistory.FieldKeywords:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeywords(v)
+		return nil
+	case articlehistory.FieldEditorID:
+		v, ok := value.(uint)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEditorID(v)
+		return nil
+	case articlehistory.FieldEditorNickname:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEditorNickname(v)
+		return nil
+	case articlehistory.FieldChangeNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChangeNote(v)
+		return nil
+	case articlehistory.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case articlehistory.FieldExtraData:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExtraData(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ArticleHistoryMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, articlehistory.FieldVersion)
+	}
+	if m.addword_count != nil {
+		fields = append(fields, articlehistory.FieldWordCount)
+	}
+	if m.addeditor_id != nil {
+		fields = append(fields, articlehistory.FieldEditorID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ArticleHistoryMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case articlehistory.FieldVersion:
+		return m.AddedVersion()
+	case articlehistory.FieldWordCount:
+		return m.AddedWordCount()
+	case articlehistory.FieldEditorID:
+		return m.AddedEditorID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ArticleHistoryMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case articlehistory.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	case articlehistory.FieldWordCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWordCount(v)
+		return nil
+	case articlehistory.FieldEditorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddEditorID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ArticleHistoryMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(articlehistory.FieldContentMd) {
+		fields = append(fields, articlehistory.FieldContentMd)
+	}
+	if m.FieldCleared(articlehistory.FieldContentHTML) {
+		fields = append(fields, articlehistory.FieldContentHTML)
+	}
+	if m.FieldCleared(articlehistory.FieldCoverURL) {
+		fields = append(fields, articlehistory.FieldCoverURL)
+	}
+	if m.FieldCleared(articlehistory.FieldTopImgURL) {
+		fields = append(fields, articlehistory.FieldTopImgURL)
+	}
+	if m.FieldCleared(articlehistory.FieldPrimaryColor) {
+		fields = append(fields, articlehistory.FieldPrimaryColor)
+	}
+	if m.FieldCleared(articlehistory.FieldSummaries) {
+		fields = append(fields, articlehistory.FieldSummaries)
+	}
+	if m.FieldCleared(articlehistory.FieldKeywords) {
+		fields = append(fields, articlehistory.FieldKeywords)
+	}
+	if m.FieldCleared(articlehistory.FieldEditorNickname) {
+		fields = append(fields, articlehistory.FieldEditorNickname)
+	}
+	if m.FieldCleared(articlehistory.FieldChangeNote) {
+		fields = append(fields, articlehistory.FieldChangeNote)
+	}
+	if m.FieldCleared(articlehistory.FieldExtraData) {
+		fields = append(fields, articlehistory.FieldExtraData)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ArticleHistoryMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ArticleHistoryMutation) ClearField(name string) error {
+	switch name {
+	case articlehistory.FieldContentMd:
+		m.ClearContentMd()
+		return nil
+	case articlehistory.FieldContentHTML:
+		m.ClearContentHTML()
+		return nil
+	case articlehistory.FieldCoverURL:
+		m.ClearCoverURL()
+		return nil
+	case articlehistory.FieldTopImgURL:
+		m.ClearTopImgURL()
+		return nil
+	case articlehistory.FieldPrimaryColor:
+		m.ClearPrimaryColor()
+		return nil
+	case articlehistory.FieldSummaries:
+		m.ClearSummaries()
+		return nil
+	case articlehistory.FieldKeywords:
+		m.ClearKeywords()
+		return nil
+	case articlehistory.FieldEditorNickname:
+		m.ClearEditorNickname()
+		return nil
+	case articlehistory.FieldChangeNote:
+		m.ClearChangeNote()
+		return nil
+	case articlehistory.FieldExtraData:
+		m.ClearExtraData()
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ArticleHistoryMutation) ResetField(name string) error {
+	switch name {
+	case articlehistory.FieldArticleID:
+		m.ResetArticleID()
+		return nil
+	case articlehistory.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case articlehistory.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case articlehistory.FieldContentMd:
+		m.ResetContentMd()
+		return nil
+	case articlehistory.FieldContentHTML:
+		m.ResetContentHTML()
+		return nil
+	case articlehistory.FieldCoverURL:
+		m.ResetCoverURL()
+		return nil
+	case articlehistory.FieldTopImgURL:
+		m.ResetTopImgURL()
+		return nil
+	case articlehistory.FieldPrimaryColor:
+		m.ResetPrimaryColor()
+		return nil
+	case articlehistory.FieldSummaries:
+		m.ResetSummaries()
+		return nil
+	case articlehistory.FieldWordCount:
+		m.ResetWordCount()
+		return nil
+	case articlehistory.FieldKeywords:
+		m.ResetKeywords()
+		return nil
+	case articlehistory.FieldEditorID:
+		m.ResetEditorID()
+		return nil
+	case articlehistory.FieldEditorNickname:
+		m.ResetEditorNickname()
+		return nil
+	case articlehistory.FieldChangeNote:
+		m.ResetChangeNote()
+		return nil
+	case articlehistory.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case articlehistory.FieldExtraData:
+		m.ResetExtraData()
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ArticleHistoryMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.article != nil {
+		edges = append(edges, articlehistory.EdgeArticle)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ArticleHistoryMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case articlehistory.EdgeArticle:
+		if id := m.article; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ArticleHistoryMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ArticleHistoryMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ArticleHistoryMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedarticle {
+		edges = append(edges, articlehistory.EdgeArticle)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ArticleHistoryMutation) EdgeCleared(name string) bool {
+	switch name {
+	case articlehistory.EdgeArticle:
+		return m.clearedarticle
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ArticleHistoryMutation) ClearEdge(name string) error {
+	switch name {
+	case articlehistory.EdgeArticle:
+		m.ClearArticle()
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ArticleHistoryMutation) ResetEdge(name string) error {
+	switch name {
+	case articlehistory.EdgeArticle:
+		m.ResetArticle()
+		return nil
+	}
+	return fmt.Errorf("unknown ArticleHistory edge %s", name)
 }
 
 // CommentMutation represents an operation that mutates the Comment nodes in the graph.

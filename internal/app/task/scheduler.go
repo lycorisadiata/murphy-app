@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/file"
+	article_history_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article_history"
 
 	"github.com/robfig/cron/v3"
 )
@@ -22,12 +23,13 @@ type Scheduler struct {
 	cron   *cron.Cron
 	logger *slog.Logger
 	// 在这里注入所有任务可能需要的 service 依赖
-	uploadSvc file.IUploadService
+	uploadSvc         file.IUploadService
+	articleHistorySvc article_history_service.Service
 }
 
 // NewScheduler 是 Scheduler 的构造函数。
 // 它现在使用 slog 来创建 logger，并将其传递给新的装饰器。
-func NewScheduler(uploadSvc file.IUploadService) *Scheduler {
+func NewScheduler(uploadSvc file.IUploadService, articleHistorySvc article_history_service.Service) *Scheduler {
 	// 1. 创建一个 slog.Logger 实例，并为其添加一个固定的 "system":"cron" 属性。
 	slogHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	logger := slog.New(slogHandler).With("system", "cron")
@@ -44,9 +46,10 @@ func NewScheduler(uploadSvc file.IUploadService) *Scheduler {
 	)
 
 	return &Scheduler{
-		cron:      c,
-		logger:    logger,
-		uploadSvc: uploadSvc,
+		cron:              c,
+		logger:            logger,
+		uploadSvc:         uploadSvc,
+		articleHistorySvc: articleHistorySvc,
 	}
 }
 
@@ -64,6 +67,17 @@ func (s *Scheduler) RegisterJobs() {
 		os.Exit(1)
 	}
 	s.logger.Info("-> Successfully registered 'CleanupAbandonedUploadsJob'", "schedule", "every day at 3:00:00 AM")
+
+	// --- 任务2: 清理文章旧历史版本 ---
+	if s.articleHistorySvc != nil {
+		historyCleanupJob := NewArticleHistoryCleanupJob(s.articleHistorySvc)
+		_, err = s.cron.AddJob("0 30 3 * * *", historyCleanupJob)
+		if err != nil {
+			s.logger.Error("Failed to add 'ArticleHistoryCleanupJob'", slog.Any("error", err))
+			os.Exit(1)
+		}
+		s.logger.Info("-> Successfully registered 'ArticleHistoryCleanupJob'", "schedule", "every day at 3:30:00 AM")
+	}
 
 	s.logger.Info("All periodic jobs registered.")
 }

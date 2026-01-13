@@ -8,6 +8,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/ent/album"
 	"github.com/anzhiyu-c/anheyu-app/ent/albumcategory"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/directlink"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
@@ -221,6 +222,30 @@ func init() {
 	article.DefaultDocSort = articleDescDocSort.Default.(int)
 	// article.DocSortValidator is a validator for the "doc_sort" field. It is called by the builders before save.
 	article.DocSortValidator = articleDescDocSort.Validators[0].(func(int) error)
+	articlehistoryFields := schema.ArticleHistory{}.Fields()
+	_ = articlehistoryFields
+	// articlehistoryDescVersion is the schema descriptor for version field.
+	articlehistoryDescVersion := articlehistoryFields[2].Descriptor()
+	// articlehistory.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	articlehistory.VersionValidator = articlehistoryDescVersion.Validators[0].(func(int) error)
+	// articlehistoryDescTitle is the schema descriptor for title field.
+	articlehistoryDescTitle := articlehistoryFields[3].Descriptor()
+	// articlehistory.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	articlehistory.TitleValidator = articlehistoryDescTitle.Validators[0].(func(string) error)
+	// articlehistoryDescWordCount is the schema descriptor for word_count field.
+	articlehistoryDescWordCount := articlehistoryFields[10].Descriptor()
+	// articlehistory.DefaultWordCount holds the default value on creation for the word_count field.
+	articlehistory.DefaultWordCount = articlehistoryDescWordCount.Default.(int)
+	// articlehistory.WordCountValidator is a validator for the "word_count" field. It is called by the builders before save.
+	articlehistory.WordCountValidator = articlehistoryDescWordCount.Validators[0].(func(int) error)
+	// articlehistoryDescChangeNote is the schema descriptor for change_note field.
+	articlehistoryDescChangeNote := articlehistoryFields[14].Descriptor()
+	// articlehistory.ChangeNoteValidator is a validator for the "change_note" field. It is called by the builders before save.
+	articlehistory.ChangeNoteValidator = articlehistoryDescChangeNote.Validators[0].(func(string) error)
+	// articlehistoryDescCreatedAt is the schema descriptor for created_at field.
+	articlehistoryDescCreatedAt := articlehistoryFields[15].Descriptor()
+	// articlehistory.DefaultCreatedAt holds the default value on creation for the created_at field.
+	articlehistory.DefaultCreatedAt = articlehistoryDescCreatedAt.Default.(func() time.Time)
 	commentMixin := schema.Comment{}.Mixin()
 	commentMixinHooks0 := commentMixin[0].Hooks()
 	comment.Hooks[0] = commentMixinHooks0[0]

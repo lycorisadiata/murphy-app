@@ -121,6 +121,58 @@ var (
 			},
 		},
 	}
+	// ArticleHistoriesColumns holds the columns for the "article_histories" table.
+	ArticleHistoriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUint, Increment: true},
+		{Name: "version", Type: field.TypeInt, Comment: "版本号，从1开始递增"},
+		{Name: "title", Type: field.TypeString, Comment: "文章标题"},
+		{Name: "content_md", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "Markdown内容"},
+		{Name: "content_html", Type: field.TypeString, Nullable: true, Size: 2147483647, Comment: "HTML内容"},
+		{Name: "cover_url", Type: field.TypeString, Nullable: true, Comment: "封面图URL"},
+		{Name: "top_img_url", Type: field.TypeString, Nullable: true, Comment: "顶部大图URL"},
+		{Name: "primary_color", Type: field.TypeString, Nullable: true, Comment: "主色调"},
+		{Name: "summaries", Type: field.TypeJSON, Nullable: true, Comment: "摘要列表"},
+		{Name: "word_count", Type: field.TypeInt, Comment: "字数", Default: 0},
+		{Name: "keywords", Type: field.TypeString, Nullable: true, Comment: "关键词"},
+		{Name: "editor_id", Type: field.TypeUint, Comment: "编辑者ID"},
+		{Name: "editor_nickname", Type: field.TypeString, Nullable: true, Comment: "编辑者昵称（冗余存储）"},
+		{Name: "change_note", Type: field.TypeString, Nullable: true, Size: 500, Comment: "变更说明"},
+		{Name: "created_at", Type: field.TypeTime, Comment: "创建时间"},
+		{Name: "extra_data", Type: field.TypeJSON, Nullable: true, Comment: "扩展数据（PRO版付费内容等）"},
+		{Name: "article_id", Type: field.TypeUint, Comment: "关联的文章ID"},
+	}
+	// ArticleHistoriesTable holds the schema information for the "article_histories" table.
+	ArticleHistoriesTable = &schema.Table{
+		Name:       "article_histories",
+		Comment:    "文章历史版本表",
+		Columns:    ArticleHistoriesColumns,
+		PrimaryKey: []*schema.Column{ArticleHistoriesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "article_histories_articles_histories",
+				Columns:    []*schema.Column{ArticleHistoriesColumns[16]},
+				RefColumns: []*schema.Column{ArticlesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "articlehistory_article_id_version",
+				Unique:  true,
+				Columns: []*schema.Column{ArticleHistoriesColumns[16], ArticleHistoriesColumns[1]},
+			},
+			{
+				Name:    "articlehistory_article_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ArticleHistoriesColumns[16], ArticleHistoriesColumns[14]},
+			},
+			{
+				Name:    "articlehistory_editor_id",
+				Unique:  false,
+				Columns: []*schema.Column{ArticleHistoriesColumns[11]},
+			},
+		},
+	}
 	// CommentsColumns holds the columns for the "comments" table.
 	CommentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUint, Increment: true},
@@ -966,6 +1018,7 @@ var (
 		AlbumsTable,
 		AlbumCategoriesTable,
 		ArticlesTable,
+		ArticleHistoriesTable,
 		CommentsTable,
 		DirectLinksTable,
 		DocSeriesTable,
@@ -1000,6 +1053,7 @@ var (
 func init() {
 	AlbumsTable.ForeignKeys[0].RefTable = AlbumCategoriesTable
 	ArticlesTable.ForeignKeys[0].RefTable = DocSeriesTable
+	ArticleHistoriesTable.ForeignKeys[0].RefTable = ArticlesTable
 	CommentsTable.ForeignKeys[0].RefTable = ArticlesTable
 	CommentsTable.ForeignKeys[1].RefTable = CommentsTable
 	CommentsTable.ForeignKeys[2].RefTable = UsersTable

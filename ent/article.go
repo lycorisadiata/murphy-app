@@ -113,11 +113,13 @@ type ArticleEdges struct {
 	PostCategories []*PostCategory `json:"post_categories,omitempty"`
 	// Comments holds the value of the comments edge.
 	Comments []*Comment `json:"comments,omitempty"`
+	// Histories holds the value of the histories edge.
+	Histories []*ArticleHistory `json:"histories,omitempty"`
 	// DocSeries holds the value of the doc_series edge.
 	DocSeries *DocSeries `json:"doc_series,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // PostTagsOrErr returns the PostTags value or an error if the edge
@@ -147,12 +149,21 @@ func (e ArticleEdges) CommentsOrErr() ([]*Comment, error) {
 	return nil, &NotLoadedError{edge: "comments"}
 }
 
+// HistoriesOrErr returns the Histories value or an error if the edge
+// was not loaded in eager-loading.
+func (e ArticleEdges) HistoriesOrErr() ([]*ArticleHistory, error) {
+	if e.loadedTypes[3] {
+		return e.Histories, nil
+	}
+	return nil, &NotLoadedError{edge: "histories"}
+}
+
 // DocSeriesOrErr returns the DocSeries value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ArticleEdges) DocSeriesOrErr() (*DocSeries, error) {
 	if e.DocSeries != nil {
 		return e.DocSeries, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: docseries.Label}
 	}
 	return nil, &NotLoadedError{edge: "doc_series"}
@@ -472,6 +483,11 @@ func (_m *Article) QueryPostCategories() *PostCategoryQuery {
 // QueryComments queries the "comments" edge of the Article entity.
 func (_m *Article) QueryComments() *CommentQuery {
 	return NewArticleClient(_m.config).QueryComments(_m)
+}
+
+// QueryHistories queries the "histories" edge of the Article entity.
+func (_m *Article) QueryHistories() *ArticleHistoryQuery {
+	return NewArticleClient(_m.config).QueryHistories(_m)
 }
 
 // QueryDocSeries queries the "doc_series" edge of the Article entity.

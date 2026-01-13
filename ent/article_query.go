@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/anzhiyu-c/anheyu-app/ent/article"
+	"github.com/anzhiyu-c/anheyu-app/ent/articlehistory"
 	"github.com/anzhiyu-c/anheyu-app/ent/comment"
 	"github.com/anzhiyu-c/anheyu-app/ent/docseries"
 	"github.com/anzhiyu-c/anheyu-app/ent/postcategory"
@@ -30,6 +31,7 @@ type ArticleQuery struct {
 	withPostTags       *PostTagQuery
 	withPostCategories *PostCategoryQuery
 	withComments       *CommentQuery
+	withHistories      *ArticleHistoryQuery
 	withDocSeries      *DocSeriesQuery
 	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -127,6 +129,28 @@ func (_q *ArticleQuery) QueryComments() *CommentQuery {
 			sqlgraph.From(article.Table, article.FieldID, selector),
 			sqlgraph.To(comment.Table, comment.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, article.CommentsTable, article.CommentsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryHistories chains the current query on the "histories" edge.
+func (_q *ArticleQuery) QueryHistories() *ArticleHistoryQuery {
+	query := (&ArticleHistoryClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(article.Table, article.FieldID, selector),
+			sqlgraph.To(articlehistory.Table, articlehistory.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, article.HistoriesTable, article.HistoriesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -351,6 +375,7 @@ func (_q *ArticleQuery) Clone() *ArticleQuery {
 		withPostTags:       _q.withPostTags.Clone(),
 		withPostCategories: _q.withPostCategories.Clone(),
 		withComments:       _q.withComments.Clone(),
+		withHistories:      _q.withHistories.Clone(),
 		withDocSeries:      _q.withDocSeries.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
@@ -389,6 +414,17 @@ func (_q *ArticleQuery) WithComments(opts ...func(*CommentQuery)) *ArticleQuery 
 		opt(query)
 	}
 	_q.withComments = query
+	return _q
+}
+
+// WithHistories tells the query-builder to eager-load the nodes that are connected to
+// the "histories" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ArticleQuery) WithHistories(opts ...func(*ArticleHistoryQuery)) *ArticleQuery {
+	query := (&ArticleHistoryClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withHistories = query
 	return _q
 }
 
@@ -481,10 +517,11 @@ func (_q *ArticleQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Arti
 	var (
 		nodes       = []*Article{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withPostTags != nil,
 			_q.withPostCategories != nil,
 			_q.withComments != nil,
+			_q.withHistories != nil,
 			_q.withDocSeries != nil,
 		}
 	)
@@ -527,6 +564,13 @@ func (_q *ArticleQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Arti
 		if err := _q.loadComments(ctx, query, nodes,
 			func(n *Article) { n.Edges.Comments = []*Comment{} },
 			func(n *Article, e *Comment) { n.Edges.Comments = append(n.Edges.Comments, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withHistories; query != nil {
+		if err := _q.loadHistories(ctx, query, nodes,
+			func(n *Article) { n.Edges.Histories = []*ArticleHistory{} },
+			func(n *Article, e *ArticleHistory) { n.Edges.Histories = append(n.Edges.Histories, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -687,6 +731,36 @@ func (_q *ArticleQuery) loadComments(ctx context.Context, query *CommentQuery, n
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "article_comments" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ArticleQuery) loadHistories(ctx context.Context, query *ArticleHistoryQuery, nodes []*Article, init func(*Article), assign func(*Article, *ArticleHistory)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uint]*Article)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(articlehistory.FieldArticleID)
+	}
+	query.Where(predicate.ArticleHistory(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(article.HistoriesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ArticleID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "article_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}
