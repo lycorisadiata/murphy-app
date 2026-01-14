@@ -301,6 +301,20 @@ func (_c *AlbumCreate) SetNillableDescription(v *string) *AlbumCreate {
 	return _c
 }
 
+// SetLocation sets the "location" field.
+func (_c *AlbumCreate) SetLocation(v string) *AlbumCreate {
+	_c.mutation.SetLocation(v)
+	return _c
+}
+
+// SetNillableLocation sets the "location" field if the given value is not nil.
+func (_c *AlbumCreate) SetNillableLocation(v *string) *AlbumCreate {
+	if v != nil {
+		_c.SetLocation(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *AlbumCreate) SetID(v uint) *AlbumCreate {
 	_c.mutation.SetID(v)
@@ -456,6 +470,11 @@ func (_c *AlbumCreate) check() error {
 			return &ValidationError{Name: "description", err: fmt.Errorf(`ent: validator failed for field "Album.description": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.Location(); ok {
+		if err := album.LocationValidator(v); err != nil {
+			return &ValidationError{Name: "location", err: fmt.Errorf(`ent: validator failed for field "Album.location": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -568,6 +587,10 @@ func (_c *AlbumCreate) createSpec() (*Album, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(album.FieldDescription, field.TypeString, value)
 		_node.Description = value
+	}
+	if value, ok := _c.mutation.Location(); ok {
+		_spec.SetField(album.FieldLocation, field.TypeString, value)
+		_node.Location = value
 	}
 	if nodes := _c.mutation.CategoryIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -995,6 +1018,24 @@ func (u *AlbumUpsert) UpdateDescription() *AlbumUpsert {
 // ClearDescription clears the value of the "description" field.
 func (u *AlbumUpsert) ClearDescription() *AlbumUpsert {
 	u.SetNull(album.FieldDescription)
+	return u
+}
+
+// SetLocation sets the "location" field.
+func (u *AlbumUpsert) SetLocation(v string) *AlbumUpsert {
+	u.Set(album.FieldLocation, v)
+	return u
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *AlbumUpsert) UpdateLocation() *AlbumUpsert {
+	u.SetExcluded(album.FieldLocation)
+	return u
+}
+
+// ClearLocation clears the value of the "location" field.
+func (u *AlbumUpsert) ClearLocation() *AlbumUpsert {
+	u.SetNull(album.FieldLocation)
 	return u
 }
 
@@ -1466,6 +1507,27 @@ func (u *AlbumUpsertOne) UpdateDescription() *AlbumUpsertOne {
 func (u *AlbumUpsertOne) ClearDescription() *AlbumUpsertOne {
 	return u.Update(func(s *AlbumUpsert) {
 		s.ClearDescription()
+	})
+}
+
+// SetLocation sets the "location" field.
+func (u *AlbumUpsertOne) SetLocation(v string) *AlbumUpsertOne {
+	return u.Update(func(s *AlbumUpsert) {
+		s.SetLocation(v)
+	})
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *AlbumUpsertOne) UpdateLocation() *AlbumUpsertOne {
+	return u.Update(func(s *AlbumUpsert) {
+		s.UpdateLocation()
+	})
+}
+
+// ClearLocation clears the value of the "location" field.
+func (u *AlbumUpsertOne) ClearLocation() *AlbumUpsertOne {
+	return u.Update(func(s *AlbumUpsert) {
+		s.ClearLocation()
 	})
 }
 
@@ -2103,6 +2165,27 @@ func (u *AlbumUpsertBulk) UpdateDescription() *AlbumUpsertBulk {
 func (u *AlbumUpsertBulk) ClearDescription() *AlbumUpsertBulk {
 	return u.Update(func(s *AlbumUpsert) {
 		s.ClearDescription()
+	})
+}
+
+// SetLocation sets the "location" field.
+func (u *AlbumUpsertBulk) SetLocation(v string) *AlbumUpsertBulk {
+	return u.Update(func(s *AlbumUpsert) {
+		s.SetLocation(v)
+	})
+}
+
+// UpdateLocation sets the "location" field to the value that was provided on create.
+func (u *AlbumUpsertBulk) UpdateLocation() *AlbumUpsertBulk {
+	return u.Update(func(s *AlbumUpsert) {
+		s.UpdateLocation()
+	})
+}
+
+// ClearLocation clears the value of the "location" field.
+func (u *AlbumUpsertBulk) ClearLocation() *AlbumUpsertBulk {
+	return u.Update(func(s *AlbumUpsert) {
+		s.ClearLocation()
 	})
 }
 

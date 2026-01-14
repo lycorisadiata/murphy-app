@@ -428,6 +428,26 @@ func (_u *AlbumUpdate) ClearDescription() *AlbumUpdate {
 	return _u
 }
 
+// SetLocation sets the "location" field.
+func (_u *AlbumUpdate) SetLocation(v string) *AlbumUpdate {
+	_u.mutation.SetLocation(v)
+	return _u
+}
+
+// SetNillableLocation sets the "location" field if the given value is not nil.
+func (_u *AlbumUpdate) SetNillableLocation(v *string) *AlbumUpdate {
+	if v != nil {
+		_u.SetLocation(*v)
+	}
+	return _u
+}
+
+// ClearLocation clears the value of the "location" field.
+func (_u *AlbumUpdate) ClearLocation() *AlbumUpdate {
+	_u.mutation.ClearLocation()
+	return _u
+}
+
 // SetCategory sets the "category" edge to the AlbumCategory entity.
 func (_u *AlbumUpdate) SetCategory(v *AlbumCategory) *AlbumUpdate {
 	return _u.SetCategoryID(v.ID)
@@ -541,6 +561,11 @@ func (_u *AlbumUpdate) check() error {
 	if v, ok := _u.mutation.Description(); ok {
 		if err := album.DescriptionValidator(v); err != nil {
 			return &ValidationError{Name: "description", err: fmt.Errorf(`ent: validator failed for field "Album.description": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Location(); ok {
+		if err := album.LocationValidator(v); err != nil {
+			return &ValidationError{Name: "location", err: fmt.Errorf(`ent: validator failed for field "Album.location": %w`, err)}
 		}
 	}
 	return nil
@@ -677,6 +702,12 @@ func (_u *AlbumUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.DescriptionCleared() {
 		_spec.ClearField(album.FieldDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.Location(); ok {
+		_spec.SetField(album.FieldLocation, field.TypeString, value)
+	}
+	if _u.mutation.LocationCleared() {
+		_spec.ClearField(album.FieldLocation, field.TypeString)
 	}
 	if _u.mutation.CategoryCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1127,6 +1158,26 @@ func (_u *AlbumUpdateOne) ClearDescription() *AlbumUpdateOne {
 	return _u
 }
 
+// SetLocation sets the "location" field.
+func (_u *AlbumUpdateOne) SetLocation(v string) *AlbumUpdateOne {
+	_u.mutation.SetLocation(v)
+	return _u
+}
+
+// SetNillableLocation sets the "location" field if the given value is not nil.
+func (_u *AlbumUpdateOne) SetNillableLocation(v *string) *AlbumUpdateOne {
+	if v != nil {
+		_u.SetLocation(*v)
+	}
+	return _u
+}
+
+// ClearLocation clears the value of the "location" field.
+func (_u *AlbumUpdateOne) ClearLocation() *AlbumUpdateOne {
+	_u.mutation.ClearLocation()
+	return _u
+}
+
 // SetCategory sets the "category" edge to the AlbumCategory entity.
 func (_u *AlbumUpdateOne) SetCategory(v *AlbumCategory) *AlbumUpdateOne {
 	return _u.SetCategoryID(v.ID)
@@ -1253,6 +1304,11 @@ func (_u *AlbumUpdateOne) check() error {
 	if v, ok := _u.mutation.Description(); ok {
 		if err := album.DescriptionValidator(v); err != nil {
 			return &ValidationError{Name: "description", err: fmt.Errorf(`ent: validator failed for field "Album.description": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Location(); ok {
+		if err := album.LocationValidator(v); err != nil {
+			return &ValidationError{Name: "location", err: fmt.Errorf(`ent: validator failed for field "Album.location": %w`, err)}
 		}
 	}
 	return nil
@@ -1406,6 +1462,12 @@ func (_u *AlbumUpdateOne) sqlSave(ctx context.Context) (_node *Album, err error)
 	}
 	if _u.mutation.DescriptionCleared() {
 		_spec.ClearField(album.FieldDescription, field.TypeString)
+	}
+	if value, ok := _u.mutation.Location(); ok {
+		_spec.SetField(album.FieldLocation, field.TypeString, value)
+	}
+	if _u.mutation.LocationCleared() {
+		_spec.ClearField(album.FieldLocation, field.TypeString)
 	}
 	if _u.mutation.CategoryCleared() {
 		edge := &sqlgraph.EdgeSpec{

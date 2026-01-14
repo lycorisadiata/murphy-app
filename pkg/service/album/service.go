@@ -43,6 +43,8 @@ type CreateAlbumParams struct {
 	DisplayOrder int
 	Title        string
 	Description  string
+	Location     string
+	CreatedAt    *time.Time
 }
 
 // UpdateAlbumParams 定义了更新相册时需要的参数
@@ -57,6 +59,7 @@ type UpdateAlbumParams struct {
 	DisplayOrder *int
 	Title        string
 	Description  string
+	Location     string
 }
 
 // FindAlbumsParams 定义了查询相册时需要的参数
@@ -121,6 +124,7 @@ type ExportAlbumItem struct {
 	DisplayOrder int       `json:"display_order"`
 	Title        string    `json:"title"`
 	Description  string    `json:"description"`
+	Location     string    `json:"location"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -194,6 +198,12 @@ func (s *albumService) CreateAlbum(ctx context.Context, params CreateAlbumParams
 		DisplayOrder: params.DisplayOrder,
 		Title:        params.Title,
 		Description:  params.Description,
+		Location:     params.Location,
+	}
+
+	// 如果提供了自定义的创建时间，则使用它
+	if params.CreatedAt != nil {
+		album.CreatedAt = *params.CreatedAt
 	}
 
 	// 在存入数据库前，应用默认值
@@ -264,6 +274,7 @@ func (s *albumService) UpdateAlbum(ctx context.Context, id uint, params UpdateAl
 	album.Tags = strings.Join(params.Tags, ",")
 	album.Title = params.Title
 	album.Description = params.Description
+	album.Location = params.Location
 
 	if params.DisplayOrder != nil {
 		album.DisplayOrder = *params.DisplayOrder
@@ -566,6 +577,7 @@ func (s *albumService) ExportAlbums(ctx context.Context, albumIDs []uint) (*Expo
 			DisplayOrder: album.DisplayOrder,
 			Title:        album.Title,
 			Description:  album.Description,
+			Location:     album.Location,
 			CreatedAt:    album.CreatedAt,
 			UpdatedAt:    album.UpdatedAt,
 		}

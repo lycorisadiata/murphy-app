@@ -60,6 +60,8 @@ type Album struct {
 	Title string `json:"title,omitempty"`
 	// 图片描述
 	Description string `json:"description,omitempty"`
+	// 拍摄地点
+	Location string `json:"location,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the AlbumQuery when eager-loading is set.
 	Edges        AlbumEdges `json:"edges"`
@@ -93,7 +95,7 @@ func (*Album) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case album.FieldID, album.FieldViewCount, album.FieldDownloadCount, album.FieldWidth, album.FieldHeight, album.FieldFileSize, album.FieldDisplayOrder, album.FieldCategoryID:
 			values[i] = new(sql.NullInt64)
-		case album.FieldImageURL, album.FieldBigImageURL, album.FieldDownloadURL, album.FieldThumbParam, album.FieldBigParam, album.FieldTags, album.FieldFormat, album.FieldAspectRatio, album.FieldFileHash, album.FieldTitle, album.FieldDescription:
+		case album.FieldImageURL, album.FieldBigImageURL, album.FieldDownloadURL, album.FieldThumbParam, album.FieldBigParam, album.FieldTags, album.FieldFormat, album.FieldAspectRatio, album.FieldFileHash, album.FieldTitle, album.FieldDescription, album.FieldLocation:
 			values[i] = new(sql.NullString)
 		case album.FieldDeletedAt, album.FieldCreatedAt, album.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -245,6 +247,12 @@ func (_m *Album) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Description = value.String
 			}
+		case album.FieldLocation:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field location", values[i])
+			} else if value.Valid {
+				_m.Location = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -350,6 +358,9 @@ func (_m *Album) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(_m.Description)
+	builder.WriteString(", ")
+	builder.WriteString("location=")
+	builder.WriteString(_m.Location)
 	builder.WriteByte(')')
 	return builder.String()
 }

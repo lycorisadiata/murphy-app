@@ -32,6 +32,7 @@ type Album struct {
 	CategoryID    *uint     `json:"categoryId"`
 	Title         string    `json:"title"`
 	Description   string    `json:"description"`
+	Location      string    `json:"location"`
 }
 
 // AlbumCategoryDTO 是相册分类的数据传输对象

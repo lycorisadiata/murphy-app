@@ -24,7 +24,7 @@ func NewEntAlbumRepository(client *ent.Client) repository.AlbumRepository {
 }
 
 func (r *entAlbumRepository) Create(ctx context.Context, domainAlbum *model.Album) error {
-	created, err := r.client.Album.
+	create := r.client.Album.
 		Create().
 		SetImageURL(domainAlbum.ImageUrl).
 		SetBigImageURL(domainAlbum.BigImageUrl).
@@ -43,7 +43,14 @@ func (r *entAlbumRepository) Create(ctx context.Context, domainAlbum *model.Albu
 		SetDisplayOrder(domainAlbum.DisplayOrder).
 		SetTitle(domainAlbum.Title).
 		SetDescription(domainAlbum.Description).
-		Save(ctx)
+		SetLocation(domainAlbum.Location)
+
+	// 如果传入了自定义的创建时间，则使用它
+	if !domainAlbum.CreatedAt.IsZero() {
+		create = create.SetCreatedAt(domainAlbum.CreatedAt)
+	}
+
+	created, err := create.Save(ctx)
 	if err != nil {
 		return err
 	}
@@ -104,11 +111,17 @@ func (r *entAlbumRepository) CreateOrRestore(ctx context.Context, domainAlbum *m
 			SetFileHash(domainAlbum.FileHash).
 			SetDisplayOrder(domainAlbum.DisplayOrder).
 			SetTitle(domainAlbum.Title).
-			SetDescription(domainAlbum.Description)
+			SetDescription(domainAlbum.Description).
+			SetLocation(domainAlbum.Location)
 
 		// 处理可选的 CategoryID
 		if domainAlbum.CategoryID != nil {
 			create = create.SetCategoryID(*domainAlbum.CategoryID)
+		}
+
+		// 如果传入了自定义的创建时间，则使用它
+		if !domainAlbum.CreatedAt.IsZero() {
+			create = create.SetCreatedAt(domainAlbum.CreatedAt)
 		}
 
 		newAlbumPO, createErr := create.Save(ctx)
@@ -162,7 +175,8 @@ func (r *entAlbumRepository) Update(ctx context.Context, domainAlbum *model.Albu
 		SetFileHash(domainAlbum.FileHash).
 		SetDisplayOrder(domainAlbum.DisplayOrder).
 		SetTitle(domainAlbum.Title).
-		SetDescription(domainAlbum.Description)
+		SetDescription(domainAlbum.Description).
+		SetLocation(domainAlbum.Location)
 
 	// 处理可选的 CategoryID
 	if domainAlbum.CategoryID != nil {
@@ -309,5 +323,6 @@ func toDomainAlbum(po *ent.Album) *model.Album {
 		DisplayOrder:  po.DisplayOrder,
 		Title:         po.Title,
 		Description:   po.Description,
+		Location:      po.Location,
 	}
 }

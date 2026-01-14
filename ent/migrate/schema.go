@@ -31,6 +31,7 @@ var (
 		{Name: "display_order", Type: field.TypeInt, Comment: "排序字段，数字越小越靠前", Default: 0},
 		{Name: "title", Type: field.TypeString, Nullable: true, Size: 255, Comment: "图片标题"},
 		{Name: "description", Type: field.TypeString, Nullable: true, Size: 1000, Comment: "图片描述"},
+		{Name: "location", Type: field.TypeString, Nullable: true, Size: 200, Comment: "拍摄地点"},
 		{Name: "category_id", Type: field.TypeUint, Nullable: true, Comment: "分类ID"},
 	}
 	// AlbumsTable holds the schema information for the "albums" table.
@@ -42,7 +43,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "albums_album_categories_albums",
-				Columns:    []*schema.Column{AlbumsColumns[21]},
+				Columns:    []*schema.Column{AlbumsColumns[22]},
 				RefColumns: []*schema.Column{AlbumCategoriesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},

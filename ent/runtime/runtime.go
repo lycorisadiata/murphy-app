@@ -127,6 +127,10 @@ func init() {
 	albumDescDescription := albumFields[20].Descriptor()
 	// album.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	album.DescriptionValidator = albumDescDescription.Validators[0].(func(string) error)
+	// albumDescLocation is the schema descriptor for location field.
+	albumDescLocation := albumFields[21].Descriptor()
+	// album.LocationValidator is a validator for the "location" field. It is called by the builders before save.
+	album.LocationValidator = albumDescLocation.Validators[0].(func(string) error)
 	albumcategoryFields := schema.AlbumCategory{}.Fields()
 	_ = albumcategoryFields
 	// albumcategoryDescName is the schema descriptor for name field.

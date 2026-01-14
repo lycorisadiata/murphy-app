@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 安知鱼
  * @Date: 2025-07-12 18:40:05
- * @LastEditTime: 2025-07-12 18:40:10
+ * @LastEditTime: 2026-01-14 13:26:11
  * @LastEditors: 安知鱼
  */
 package schema
@@ -114,6 +114,10 @@ func (Album) Fields() []ent.Field {
 			MaxLen(1000).
 			Optional().
 			Comment("图片描述"),
+		field.String("location").
+			MaxLen(200).
+			Optional().
+			Comment("拍摄地点"),
 	}
 }
 

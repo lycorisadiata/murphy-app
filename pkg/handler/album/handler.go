@@ -110,6 +110,7 @@ func (h *AlbumHandler) GetAlbums(c *gin.Context) {
 		DisplayOrder   int       `json:"displayOrder"`
 		Title          string    `json:"title"`
 		Description    string    `json:"description"`
+		Location       string    `json:"location"`
 	}
 
 	// 从 PageResult 中获取 Items
@@ -137,6 +138,7 @@ func (h *AlbumHandler) GetAlbums(c *gin.Context) {
 			DisplayOrder:   album.DisplayOrder,
 			Title:          album.Title,
 			Description:    album.Description,
+			Location:       album.Location,
 		})
 	}
 
@@ -162,21 +164,23 @@ func (h *AlbumHandler) GetAlbums(c *gin.Context) {
 // @Router       /albums [post]
 func (h *AlbumHandler) AddAlbum(c *gin.Context) {
 	var req struct {
-		CategoryID   *uint    `json:"categoryId"`
-		ImageUrl     string   `json:"imageUrl" binding:"required"`
-		BigImageUrl  string   `json:"bigImageUrl"`
-		DownloadUrl  string   `json:"downloadUrl"`
-		ThumbParam   string   `json:"thumbParam"`
-		BigParam     string   `json:"bigParam"`
-		Tags         []string `json:"tags"`
-		Width        int      `json:"width"`
-		Height       int      `json:"height"`
-		FileSize     int64    `json:"fileSize"`
-		Format       string   `json:"format"`
-		FileHash     string   `json:"fileHash" binding:"required"`
-		DisplayOrder int      `json:"displayOrder"`
-		Title        string   `json:"title"`
-		Description  string   `json:"description"`
+		CategoryID   *uint      `json:"categoryId"`
+		ImageUrl     string     `json:"imageUrl" binding:"required"`
+		BigImageUrl  string     `json:"bigImageUrl"`
+		DownloadUrl  string     `json:"downloadUrl"`
+		ThumbParam   string     `json:"thumbParam"`
+		BigParam     string     `json:"bigParam"`
+		Tags         []string   `json:"tags"`
+		Width        int        `json:"width"`
+		Height       int        `json:"height"`
+		FileSize     int64      `json:"fileSize"`
+		Format       string     `json:"format"`
+		FileHash     string     `json:"fileHash" binding:"required"`
+		DisplayOrder int        `json:"displayOrder"`
+		Title        string     `json:"title"`
+		Description  string     `json:"description"`
+		Location     string     `json:"location"`
+		CreatedAt    *time.Time `json:"created_at"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -200,6 +204,8 @@ func (h *AlbumHandler) AddAlbum(c *gin.Context) {
 		DisplayOrder: req.DisplayOrder,
 		Title:        req.Title,
 		Description:  req.Description,
+		Location:     req.Location,
+		CreatedAt:    req.CreatedAt,
 	})
 
 	if err != nil {
@@ -300,6 +306,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		DisplayOrder *int     `json:"displayOrder"`
 		Title        string   `json:"title"`
 		Description  string   `json:"description"`
+		Location     string   `json:"location"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "参数错误: "+err.Error())
@@ -317,6 +324,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		DisplayOrder: req.DisplayOrder,
 		Title:        req.Title,
 		Description:  req.Description,
+		Location:     req.Location,
 	})
 
 	if err != nil {

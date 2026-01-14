@@ -57,6 +57,8 @@ const (
 	FieldTitle = "title"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
+	// FieldLocation holds the string denoting the location field in the database.
+	FieldLocation = "location"
 	// EdgeCategory holds the string denoting the category edge name in mutations.
 	EdgeCategory = "category"
 	// Table holds the table name of the album in the database.
@@ -94,6 +96,7 @@ var Columns = []string{
 	FieldCategoryID,
 	FieldTitle,
 	FieldDescription,
+	FieldLocation,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -147,6 +150,8 @@ var (
 	TitleValidator func(string) error
 	// DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	DescriptionValidator func(string) error
+	// LocationValidator is a validator for the "location" field. It is called by the builders before save.
+	LocationValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the Album queries.
@@ -260,6 +265,11 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // ByDescription orders the results by the description field.
 func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDescription, opts...).ToFunc()
+}
+
+// ByLocation orders the results by the location field.
+func ByLocation(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLocation, opts...).ToFunc()
 }
 
 // ByCategoryField orders the results by category field.
