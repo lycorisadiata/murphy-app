@@ -1429,6 +1429,15 @@ func (s *serviceImpl) Delete(ctx context.Context, publicID string) error {
 			docSeriesDBID = *article.DocSeriesID
 		}
 
+		// 先删除文章历史版本记录（解决外键约束问题）
+		articleDBID, _, decodeErr := idgen.DecodePublicID(publicID)
+		if decodeErr == nil {
+			if err := repos.ArticleHistory.DeleteByArticle(ctx, articleDBID); err != nil {
+				log.Printf("[警告] 删除文章历史版本记录失败: %v", err)
+				// 不中断删除流程，继续尝试删除文章
+			}
+		}
+
 		if err := repos.Article.Delete(ctx, publicID); err != nil {
 			return err
 		}
@@ -1476,23 +1485,6 @@ func (s *serviceImpl) Delete(ctx context.Context, publicID string) error {
 			log.Printf("[警告] 删除搜索索引失败: %v", err)
 		}
 	}()
-
-	// 异步删除文章历史版本记录
-	if s.historyRepo != nil {
-		go func() {
-			bgCtx := context.Background()
-			articleDBID, _, err := idgen.DecodePublicID(publicID)
-			if err != nil {
-				log.Printf("[警告] 解码文章ID失败，无法清理历史版本: %v", err)
-				return
-			}
-			if err := s.historyRepo.DeleteByArticle(bgCtx, articleDBID); err != nil {
-				log.Printf("[警告] 删除文章历史版本记录失败: %v", err)
-			} else {
-				log.Printf("[信息] 已清理文章 %s 的历史版本记录", publicID)
-			}
-		}()
-	}
 
 	return nil
 }

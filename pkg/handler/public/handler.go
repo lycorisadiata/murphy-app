@@ -8,12 +8,12 @@
 package public_handler
 
 import (
-	// 1. 引入 fmt 包用于打印日志
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/album"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/album_category"
@@ -71,10 +71,10 @@ func (h *PublicHandler) GetPublicAlbums(c *gin.Context) {
 
 	var startTime, endTime *time.Time
 	const layout = "2006/01/02 15:04:05"
-	if t, err := time.ParseInLocation(layout, startStr, time.Local); err == nil {
+	if t, err := utils.ParseInChina(layout, startStr); err == nil {
 		startTime = &t
 	}
-	if t, err := time.ParseInLocation(layout, endStr, time.Local); err == nil {
+	if t, err := utils.ParseInChina(layout, endStr); err == nil {
 		endTime = &t
 	}
 

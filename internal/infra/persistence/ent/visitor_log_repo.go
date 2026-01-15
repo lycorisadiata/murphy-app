@@ -13,6 +13,7 @@ import (
 
 	"github.com/anzhiyu-c/anheyu-app/ent"
 	"github.com/anzhiyu-c/anheyu-app/ent/visitorlog"
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/model"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/repository"
 )
@@ -91,9 +92,8 @@ func (r *entVisitorLogRepository) GetByVisitorID(ctx context.Context, visitorID 
 }
 
 func (r *entVisitorLogRepository) CountUniqueVisitors(ctx context.Context, date time.Time) (int64, error) {
-	// 使用本地时区来匹配数据库中存储的时间（数据库使用服务器本地时间）
-	loc := time.Local
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
+	// 使用中国时区 UTC+8 来匹配数据库中存储的时间
+	startOfDay := utils.StartOfDayInChina(date)
 	endOfDay := startOfDay.AddDate(0, 0, 1)
 	visitorIDs, err := r.client.VisitorLog.
 		Query().
@@ -112,10 +112,9 @@ func (r *entVisitorLogRepository) CountUniqueVisitors(ctx context.Context, date 
 }
 
 func (r *entVisitorLogRepository) CountTotalViews(ctx context.Context, date time.Time) (int64, error) {
-	// 使用本地时区来匹配数据库中存储的时间（数据库使用服务器本地时间）
-	loc := time.Local
-	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
-	endOfDay := startOfDay.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	// 使用中国时区 UTC+8 来匹配数据库中存储的时间
+	startOfDay := utils.StartOfDayInChina(date)
+	endOfDay := utils.EndOfDayInChina(date)
 
 	count, err := r.client.VisitorLog.Query().
 		Where(
@@ -227,7 +226,7 @@ func (r *entVisitorLogRepository) GetVisitorAnalytics(ctx context.Context, start
 }
 
 func (r *entVisitorLogRepository) CleanupOldLogs(ctx context.Context, keepDays int) error {
-	cutoffDate := time.Now().AddDate(0, 0, -keepDays)
+	cutoffDate := utils.NowInChina().AddDate(0, 0, -keepDays)
 
 	_, err := r.client.VisitorLog.Delete().
 		Where(visitorlog.CreatedAtLT(cutoffDate)).

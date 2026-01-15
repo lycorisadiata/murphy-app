@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/album"
 
@@ -65,10 +66,10 @@ func (h *AlbumHandler) GetAlbums(c *gin.Context) {
 
 	var startTime, endTime *time.Time
 	const layout = "2006/01/02 15:04:05"
-	if t, err := time.ParseInLocation(layout, startStr, time.Local); err == nil {
+	if t, err := utils.ParseInChina(layout, startStr); err == nil {
 		startTime = &t
 	}
-	if t, err := time.ParseInLocation(layout, endStr, time.Local); err == nil {
+	if t, err := utils.ParseInChina(layout, endStr); err == nil {
 		endTime = &t
 	}
 

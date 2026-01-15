@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/anzhiyu-c/anheyu-app/ent"
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/model"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/repository"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/utility"
@@ -180,7 +181,7 @@ func (s *visitorStatService) processVisitTask(task *visitTask) {
 	}
 
 	ctx := task.ctx
-	now := task.timestamp
+	now := utils.ToChina(task.timestamp)
 	today := now.Format("2006-01-02")
 
 	// 1. Redis批量操作（判断新访客 + 更新计数）
@@ -423,7 +424,7 @@ func (s *visitorStatService) RecordVisit(ctx context.Context, c *gin.Context, re
 		userAgent: userAgent,
 		visitorID: visitorID,
 		req:       req,
-		timestamp: time.Now(),
+		timestamp: utils.NowInChina(),
 	}
 
 	if enablePerfLog {
@@ -468,7 +469,7 @@ func (s *visitorStatService) GetBasicStatistics(ctx context.Context) (*model.Vis
 	// 缓存未命中，尝试从Redis实时计数获取
 	if s.cacheService != nil {
 		stats := &model.VisitorStatistics{}
-		now := time.Now()
+		now := utils.NowInChina()
 		today := now.Format("2006-01-02")
 
 		// 从Redis获取今日实时数据
@@ -555,7 +556,7 @@ func (s *visitorStatService) GetTopPages(ctx context.Context, limit int) ([]*mod
 }
 
 func (s *visitorStatService) GetVisitorTrend(ctx context.Context, period string, days int) (*model.VisitorTrendData, error) {
-	endDate := time.Now()
+	endDate := utils.NowInChina()
 	startDate := endDate.AddDate(0, 0, -days)
 
 	stats, err := s.visitorStatRepo.GetByDateRange(ctx, startDate, endDate)
@@ -600,14 +601,23 @@ func (s *visitorStatService) AggregateDaily(ctx context.Context, date time.Time)
 		BounceCount:    0,          // 需要单独统计跳出次数
 	}
 
-	return s.visitorStatRepo.CreateOrUpdate(ctx, stat)
+	if err := s.visitorStatRepo.CreateOrUpdate(ctx, stat); err != nil {
+		return err
+	}
+
+	// 聚合完成后清除统计缓存，确保下次查询获取最新数据
+	if s.cacheService != nil {
+		s.cacheService.Delete(ctx, CacheKeyBasicStats)
+	}
+
+	return nil
 }
 
 // GetRealTimeStats 获取实时统计数据（优先从缓存获取）
 func (s *visitorStatService) GetRealTimeStats(ctx context.Context) (*model.VisitorStatistics, error) {
 	// 尝试从缓存获取
 	if s.cacheService != nil {
-		cacheKey := CacheKeyRealTime + time.Now().Format("2006-01-02")
+		cacheKey := CacheKeyRealTime + utils.NowInChina().Format("2006-01-02")
 		cachedData, err := s.cacheService.Get(ctx, cacheKey)
 		if err == nil && cachedData != "" {
 			var stats model.VisitorStatistics
@@ -688,7 +698,7 @@ func (s *visitorStatService) updateRealTimeCounts(ctx context.Context, c *gin.Co
 		return nil
 	}
 
-	now := time.Now()
+	now := utils.NowInChina()
 	today := now.Format("2006-01-02")
 
 	// 使用Redis原子操作增加计数
@@ -726,7 +736,7 @@ func (s *visitorStatService) updateRealTimeCounts(ctx context.Context, c *gin.Co
 // 批量写入访问记录
 func (s *visitorStatService) batchWriteVisit(ctx context.Context, c *gin.Context, req *model.VisitorLogRequest) error {
 	// 1. 将访问记录添加到批量队列
-	batchKey := CacheKeyBatchQueue + time.Now().Format("2006-01-02")
+	batchKey := CacheKeyBatchQueue + utils.NowInChina().Format("2006-01-02")
 
 	// 创建访问日志
 	userAgent := c.GetHeader("User-Agent")
@@ -749,7 +759,7 @@ func (s *visitorStatService) batchWriteVisit(ctx context.Context, c *gin.Context
 		Device:    &device,
 		Duration:  req.Duration,
 		IsBounce:  req.Duration < 10,
-		CreatedAt: time.Now(),
+		CreatedAt: utils.NowInChina(),
 	}
 
 	// 2. 添加到批量队列
@@ -949,7 +959,7 @@ func (s *visitorStatService) GetBasicStatisticsOptimized(ctx context.Context) (*
 	// 2. 从Redis实时计数获取今日数据
 	stats := &model.VisitorStatistics{}
 	if s.cacheService != nil {
-		now := time.Now()
+		now := utils.NowInChina()
 		today := now.Format("2006-01-02")
 
 		// 获取实时访问量

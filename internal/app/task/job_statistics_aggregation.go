@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/statistics"
 )
 
@@ -36,9 +37,9 @@ func (j *StatisticsAggregationJob) Run() {
 
 	j.logger.Info("开始执行统计数据聚合任务")
 
-	// 聚合昨天的数据（使用本地时区，与访问日志记录时间保持一致）
-	now := time.Now()
-	yesterday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, -1)
+	// 聚合昨天的数据（使用中国时区 UTC+8，与访问日志记录时间保持一致）
+	now := utils.NowInChina()
+	yesterday := utils.StartOfDayInChina(now).AddDate(0, 0, -1)
 	if err := j.statService.AggregateDaily(ctx, yesterday); err != nil {
 		j.logger.Error("聚合昨日统计数据失败", slog.Any("error", err), slog.Time("date", yesterday))
 		return
