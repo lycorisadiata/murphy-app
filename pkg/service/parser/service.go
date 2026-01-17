@@ -38,6 +38,14 @@ type EmojiPack struct {
 	Container []EmojiDef `json:"container"`
 }
 
+// 缓存配置常量
+const (
+	// 缓存容量：最多缓存 500 条解析结果
+	cacheCapacity = 500
+	// 缓存 TTL：30 分钟
+	cacheTTL = 30 * time.Minute
+)
+
 // Service 是一个支持动态加载表情包和HTML安全过滤的解析服务
 type Service struct {
 	settingSvc      setting.SettingService
@@ -48,6 +56,10 @@ type Service struct {
 	emojiReplacer   *strings.Replacer
 	currentEmojiURL string
 	mermaidRegex    *regexp.Regexp
+
+	// 缓存：避免重复解析相同内容
+	htmlCache     *LRUCache // Markdown -> HTML 缓存
+	sanitizeCache *LRUCache // HTML -> SafeHTML 缓存
 }
 
 // NewService 创建一个新的解析服务实例
@@ -149,11 +161,13 @@ func NewService(settingSvc setting.SettingService, bus *event.EventBus) *Service
 	policy.AllowAttrs("id").OnElements("div", "h1", "h2", "h3", "h4", "h5", "h6", "button", "a", "img", "span", "code", "pre", "table", "thead", "tbody", "tr", "th", "td", "font", "details", "summary", "svg", "blockquote", "video", "iframe")
 
 	svc := &Service{
-		settingSvc:   settingSvc,
-		mdParser:     mdParser,
-		policy:       policy,
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
-		mermaidRegex: regexp.MustCompile(`(?s)<(?:p|div)[^>]*class="[^"]*md-editor-mermaid[^"]*"[^>]*>.*?</(?:p|div)>`),
+		settingSvc:    settingSvc,
+		mdParser:      mdParser,
+		policy:        policy,
+		httpClient:    &http.Client{Timeout: 10 * time.Second},
+		mermaidRegex:  regexp.MustCompile(`(?s)<(?:p|div)[^>]*class="[^"]*md-editor-mermaid[^"]*"[^>]*>.*?</(?:p|div)>`),
+		htmlCache:     NewLRUCache(cacheCapacity, cacheTTL),
+		sanitizeCache: NewLRUCache(cacheCapacity, cacheTTL),
 	}
 
 	bus.Subscribe(event.Topic(setting.TopicSettingUpdated), svc.handleSettingUpdate)
@@ -180,9 +194,23 @@ func (s *Service) handleSettingUpdate(eventData interface{}) {
 		if evt.Value != currentURL {
 			log.Printf("检测到表情包CDN链接变更。旧: '%s', 新: '%s'。正在更新...", currentURL, evt.Value)
 			s.updateEmojiData(context.Background(), evt.Value)
+
+			// 清空缓存，因为表情包变化会影响解析结果
+			s.clearCaches()
+			log.Println("已清空解析缓存以应用新的表情包配置")
 		} else {
 			log.Printf("接收到表情包配置更新事件，但URL '%s' 未发生变化，无需重新加载。", evt.Value)
 		}
+	}
+}
+
+// clearCaches 清空所有解析缓存
+func (s *Service) clearCaches() {
+	if s.htmlCache != nil {
+		s.htmlCache.Clear()
+	}
+	if s.sanitizeCache != nil {
+		s.sanitizeCache.Clear()
 	}
 }
 
@@ -247,7 +275,17 @@ func (s *Service) updateEmojiData(ctx context.Context, emojiURL string) {
 }
 
 // ToHTML 将包含表情包和Markdown的文本转换为安全的HTML。
+// 使用缓存机制避免重复解析相同内容，显著提升性能。
 func (s *Service) ToHTML(ctx context.Context, content string) (string, error) {
+	// 计算内容的缓存键
+	cacheKey := computeCacheKey(content)
+
+	// 尝试从缓存获取
+	if cached, hit := s.htmlCache.Get(cacheKey); hit {
+		return cached, nil
+	}
+
+	// 缓存未命中，执行解析
 	placeholders := make(map[string]string)
 	replacedContent := s.mermaidRegex.ReplaceAllStringFunc(content, func(match string) string {
 		placeholder := "MERMAID_PLACEHOLDER_" + uuid.New().String()
@@ -269,10 +307,19 @@ func (s *Service) ToHTML(ctx context.Context, content string) (string, error) {
 
 	safeHTML := s.policy.Sanitize(buf.String())
 
+	// 使用 strings.NewReplacer 进行批量替换，性能更优
 	finalHTML := safeHTML
-	for placeholder, originalMermaid := range placeholders {
-		finalHTML = strings.Replace(finalHTML, placeholder, originalMermaid, 1)
+	if len(placeholders) > 0 {
+		replacerPairs := make([]string, 0, len(placeholders)*2)
+		for placeholder, originalMermaid := range placeholders {
+			replacerPairs = append(replacerPairs, placeholder, originalMermaid)
+		}
+		batchReplacer := strings.NewReplacer(replacerPairs...)
+		finalHTML = batchReplacer.Replace(safeHTML)
 	}
+
+	// 存入缓存
+	s.htmlCache.Set(cacheKey, finalHTML)
 
 	return finalHTML, nil
 }
@@ -379,17 +426,27 @@ func extractMermaidBlocks(htmlContent string) (map[string]string, string) {
 
 // SanitizeHTML 仅对传入的HTML字符串进行XSS安全过滤。
 // Mermaid 图表的 action 按钮会由前端动态添加，后端只需保留 SVG 内容。
+// 使用缓存机制避免重复净化相同内容。
 func (s *Service) SanitizeHTML(htmlContent string) string {
+	// 计算内容的缓存键
+	cacheKey := computeCacheKey(htmlContent)
+
+	// 尝试从缓存获取
+	if cached, hit := s.sanitizeCache.Get(cacheKey); hit {
+		return cached
+	}
+
 	placeholders := make(map[string]string)
 
 	// 检测 Mermaid 内容并提取保护
+	contentToSanitize := htmlContent
 	if strings.Contains(htmlContent, "md-editor-mermaid") {
 		var replacedContent string
 		placeholders, replacedContent = extractMermaidBlocks(htmlContent)
-		htmlContent = replacedContent
+		contentToSanitize = replacedContent
 	} else {
 		// 使用正则表达式方法（向后兼容）
-		htmlContent = s.mermaidRegex.ReplaceAllStringFunc(htmlContent, func(match string) string {
+		contentToSanitize = s.mermaidRegex.ReplaceAllStringFunc(htmlContent, func(match string) string {
 			placeholder := "MERMAID_PLACEHOLDER_" + uuid.New().String()
 			placeholders[placeholder] = match
 			return placeholder
@@ -397,13 +454,21 @@ func (s *Service) SanitizeHTML(htmlContent string) string {
 	}
 
 	// 执行 XSS 过滤
-	safeHTML := s.policy.Sanitize(htmlContent)
+	safeHTML := s.policy.Sanitize(contentToSanitize)
 
-	// 将 Mermaid 块替换回来
+	// 使用 strings.NewReplacer 进行批量替换，性能更优
 	finalHTML := safeHTML
-	for placeholder, originalMermaid := range placeholders {
-		finalHTML = strings.Replace(finalHTML, placeholder, originalMermaid, 1)
+	if len(placeholders) > 0 {
+		replacerPairs := make([]string, 0, len(placeholders)*2)
+		for placeholder, originalMermaid := range placeholders {
+			replacerPairs = append(replacerPairs, placeholder, originalMermaid)
+		}
+		batchReplacer := strings.NewReplacer(replacerPairs...)
+		finalHTML = batchReplacer.Replace(safeHTML)
 	}
+
+	// 存入缓存
+	s.sanitizeCache.Set(cacheKey, finalHTML)
 
 	return finalHTML
 }

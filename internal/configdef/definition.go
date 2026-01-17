@@ -216,6 +216,7 @@ var AllSettings = []Definition{
 	{Key: constant.KeyCommentAIDetectRiskLevel, Value: "medium", Comment: "触发处理的最低风险等级: high(仅高风险), medium(中高风险), low(所有风险)", IsPublic: false},
 	{Key: constant.KeyCommentQQAPIURL, Value: "https://v1.nsuuu.com/api/qqname", Comment: "QQ信息查询API地址", IsPublic: false},
 	{Key: constant.KeyCommentQQAPIKey, Value: "", Comment: "QQ信息查询API密钥", IsPublic: false},
+	{Key: constant.KeyCommentQQAPIReferer, Value: "", Comment: "QQ信息查询API的Referer白名单值（需与v1.nsuuu.com控制面板配置一致）", IsPublic: true},
 	{Key: constant.KeyCommentNotifyAdmin, Value: "false", Comment: "是否在收到评论时邮件通知博主", IsPublic: false},
 	{Key: constant.KeyCommentNotifyReply, Value: "true", Comment: "是否开启评论回复邮件通知功能", IsPublic: false},
 	{Key: constant.KeyPushooChannel, Value: "", Comment: "即时消息推送平台名称，支持：bark, webhook", IsPublic: false},

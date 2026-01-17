@@ -234,6 +234,7 @@ const (
 	KeyCommentAIDetectRiskLevel SettingKey = "comment.ai_detect_risk_level" // 触发处理的风险等级: high(仅高风险), medium(中高风险), low(所有风险)
 	KeyCommentQQAPIURL          SettingKey = "comment.qq_api_url"
 	KeyCommentQQAPIKey          SettingKey = "comment.qq_api_key"
+	KeyCommentQQAPIReferer      SettingKey = "comment.qq_api_referer"
 	KeyCommentNotifyAdmin       SettingKey = "comment.notify_admin"
 	KeyCommentNotifyReply       SettingKey = "comment.notify_reply"
 	KeyPushooChannel            SettingKey = "pushoo.channel"
