@@ -69,6 +69,9 @@ type Service interface {
 
 	// SetHistoryRepo 设置文章历史版本仓储（可选注入，用于文章发布时自动记录历史版本）
 	SetHistoryRepo(historyRepo repository.ArticleHistoryRepository)
+
+	// GetArticleStatistics 获取文章统计数据（用于前台展示）
+	GetArticleStatistics(ctx context.Context) (*model.ArticleStatistics, error)
 }
 
 type serviceImpl struct {
@@ -336,6 +339,133 @@ func (s *serviceImpl) updateSiteStatsInBackground() {
 			log.Printf("[信息] 无需更新站点统计，所有项均被禁用。")
 		}
 	}()
+}
+
+// GetArticleStatistics 获取文章统计数据（用于前台展示）
+func (s *serviceImpl) GetArticleStatistics(ctx context.Context) (*model.ArticleStatistics, error) {
+	// 初始化所有切片字段为空切片，避免 JSON 序列化时输出 null
+	stats := &model.ArticleStatistics{
+		CategoryStats:  []model.CategoryStatItem{},
+		TagStats:       []model.TagStatItem{},
+		TopViewedPosts: []model.TopViewedPostItem{},
+		PublishTrend:   []model.PublishTrendItem{},
+	}
+
+	// 1. 获取基本统计数据（文章总数、总字数）
+	siteStats, err := s.repo.GetSiteStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("获取站点统计失败: %w", err)
+	}
+	stats.TotalPosts = siteStats.TotalPosts
+	stats.TotalWords = siteStats.TotalWords
+	if stats.TotalPosts > 0 {
+		stats.AvgWords = stats.TotalWords / stats.TotalPosts
+	}
+
+	// 2. 获取分类统计
+	categories, err := s.postCategoryRepo.List(ctx)
+	if err != nil {
+		log.Printf("[GetArticleStatistics] 获取分类统计失败: %v", err)
+	} else {
+		stats.CategoryStats = make([]model.CategoryStatItem, 0, len(categories))
+		for _, cat := range categories {
+			if cat.Count > 0 {
+				stats.CategoryStats = append(stats.CategoryStats, model.CategoryStatItem{
+					Name:  cat.Name,
+					Count: cat.Count,
+				})
+			}
+		}
+	}
+
+	// 3. 获取标签统计
+	tags, err := s.postTagRepo.List(ctx, &model.ListPostTagsOptions{SortBy: "count"})
+	if err != nil {
+		log.Printf("[GetArticleStatistics] 获取标签统计失败: %v", err)
+	} else {
+		stats.TagStats = make([]model.TagStatItem, 0, len(tags))
+		for _, tag := range tags {
+			if tag.Count > 0 {
+				stats.TagStats = append(stats.TagStats, model.TagStatItem{
+					Name:  tag.Name,
+					Count: tag.Count,
+				})
+			}
+		}
+	}
+
+	// 4. 获取所有已发布文章，然后手动排序获取热门文章
+	allArticles, _, err := s.repo.List(ctx, &model.ListArticlesOptions{
+		Page:     1,
+		PageSize: 10000, // 获取足够多的文章
+		Status:   "PUBLISHED",
+	})
+	if err != nil {
+		log.Printf("[GetArticleStatistics] 获取文章列表失败: %v", err)
+	} else {
+		// 计算总浏览量
+		totalViews := 0
+		for _, article := range allArticles {
+			totalViews += article.ViewCount
+		}
+		stats.TotalViews = totalViews
+
+		// 按浏览量排序获取热门文章
+		// 使用简单的冒泡排序找出前10
+		topN := 10
+		if len(allArticles) < topN {
+			topN = len(allArticles)
+		}
+
+		// 创建副本并按浏览量排序
+		sortedArticles := make([]*model.Article, len(allArticles))
+		copy(sortedArticles, allArticles)
+
+		// 简单排序获取前10
+		for i := 0; i < topN && i < len(sortedArticles)-1; i++ {
+			maxIdx := i
+			for j := i + 1; j < len(sortedArticles); j++ {
+				if sortedArticles[j].ViewCount > sortedArticles[maxIdx].ViewCount {
+					maxIdx = j
+				}
+			}
+			if maxIdx != i {
+				sortedArticles[i], sortedArticles[maxIdx] = sortedArticles[maxIdx], sortedArticles[i]
+			}
+		}
+
+		stats.TopViewedPosts = make([]model.TopViewedPostItem, 0, topN)
+		for i := 0; i < topN; i++ {
+			article := sortedArticles[i]
+			stats.TopViewedPosts = append(stats.TopViewedPosts, model.TopViewedPostItem{
+				ID:       article.ID,
+				Title:    article.Title,
+				Views:    article.ViewCount,
+				CoverURL: article.CoverURL,
+			})
+		}
+	}
+
+	// 5. 获取发布趋势（最近12个月）
+	archives, err := s.repo.GetArchiveSummary(ctx)
+	if err != nil {
+		log.Printf("[GetArticleStatistics] 获取归档摘要失败: %v", err)
+	} else {
+		stats.PublishTrend = make([]model.PublishTrendItem, 0, len(archives))
+		for _, archive := range archives {
+			month := fmt.Sprintf("%d-%02d", archive.Year, archive.Month)
+			stats.PublishTrend = append(stats.PublishTrend, model.PublishTrendItem{
+				Month: month,
+				Count: archive.Count,
+			})
+		}
+		// 限制为最近12个月
+		if len(stats.PublishTrend) > 12 {
+			stats.PublishTrend = stats.PublishTrend[:12]
+		}
+	}
+
+	return stats, nil
 }
 
 // calculatePostStats 是一个私有辅助函数，用于从 Markdown 内容计算字数和预计阅读时长。

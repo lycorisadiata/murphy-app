@@ -19,7 +19,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/cmd/server"
 )
 
-//go:embed assets/dist
+//go:embed all:assets/dist
 var content embed.FS
 
 // @title           Anheyu App API

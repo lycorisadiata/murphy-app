@@ -253,6 +253,44 @@ type SiteStats struct {
 	TotalWords int
 }
 
+// ArticleStatistics 文章统计数据（用于前台展示）
+type ArticleStatistics struct {
+	TotalPosts     int                 `json:"total_posts"`      // 文章总数
+	TotalWords     int                 `json:"total_words"`      // 总字数
+	AvgWords       int                 `json:"avg_words"`        // 平均字数
+	TotalViews     int                 `json:"total_views"`      // 总浏览量
+	CategoryStats  []CategoryStatItem  `json:"category_stats"`   // 分类统计
+	TagStats       []TagStatItem       `json:"tag_stats"`        // 标签统计
+	TopViewedPosts []TopViewedPostItem `json:"top_viewed_posts"` // 热门文章
+	PublishTrend   []PublishTrendItem  `json:"publish_trend"`    // 发布趋势
+}
+
+// CategoryStatItem 分类统计项
+type CategoryStatItem struct {
+	Name  string `json:"name"`  // 分类名称
+	Count int    `json:"count"` // 文章数量
+}
+
+// TagStatItem 标签统计项
+type TagStatItem struct {
+	Name  string `json:"name"`  // 标签名称
+	Count int    `json:"count"` // 文章数量
+}
+
+// TopViewedPostItem 热门文章项
+type TopViewedPostItem struct {
+	ID       string `json:"id"`        // 文章ID
+	Title    string `json:"title"`     // 文章标题
+	Views    int    `json:"views"`     // 浏览量
+	CoverURL string `json:"cover_url"` // 封面图
+}
+
+// PublishTrendItem 发布趋势项
+type PublishTrendItem struct {
+	Month string `json:"month"` // 月份 (格式: "2025-01")
+	Count int    `json:"count"` // 发布数量
+}
+
 // UpdateArticleComputedParams 封装了更新文章时，因内容变化而需要重新计算并持久化的数据。
 type UpdateArticleComputedParams struct {
 	WordCount            int

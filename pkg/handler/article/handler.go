@@ -167,6 +167,23 @@ func (h *Handler) ListArchives(c *gin.Context) {
 	response.Success(c, archives, "获取归档列表成功")
 }
 
+// GetArticleStatistics
+// @Summary      获取文章统计数据
+// @Description  获取文章统计数据，包括文章总数、总字数、分类统计、标签统计、热门文章等
+// @Tags         公开文章
+// @Produce      json
+// @Success      200 {object} response.Response{data=model.ArticleStatistics} "成功响应"
+// @Failure      500 {object} response.Response "服务器内部错误"
+// @Router       /public/articles/statistics [get]
+func (h *Handler) GetArticleStatistics(c *gin.Context) {
+	stats, err := h.svc.GetArticleStatistics(c.Request.Context())
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "获取文章统计失败: "+err.Error())
+		return
+	}
+	response.Success(c, stats, "获取文章统计成功")
+}
+
 // GetRandom
 // @Summary      随机获取一篇文章
 // @Description  随机获取一篇已发布的文章的详细信息，用于“随便看看”等功能。

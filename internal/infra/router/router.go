@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 安知鱼
  * @Date: 2025-06-15 11:30:55
- * @LastEditTime: 2025-10-19 20:02:52
+ * @LastEditTime: 2026-01-17 18:26:37
  * @LastEditors: 安知鱼
  */
 // anheyu-app/pkg/router/router.go
@@ -338,6 +338,7 @@ func (r *Router) registerArticleRoutes(api *gin.RouterGroup) {
 		articlesPublic.GET("/home", r.articleHandler.ListHome)
 		articlesPublic.GET("/random", r.articleHandler.GetRandom)
 		articlesPublic.GET("/archives", r.articleHandler.ListArchives)
+		articlesPublic.GET("/statistics", r.articleHandler.GetArticleStatistics)
 		// 注意：把带参数的路由放在最后，避免路由冲突
 		articlesPublic.GET("/:id", r.articleHandler.GetPublic)
 	}
