@@ -413,8 +413,8 @@ func (s *serviceImpl) ImportArticles(ctx context.Context, req *ImportArticleRequ
 			createReq.CustomUpdatedAt = &updatedAtStr
 		}
 
-		// 调用创建方法
-		createdArticle, err := s.Create(ctx, createReq, "")
+		// 调用创建方法（导入时不需要 Referer，传空字符串）
+		createdArticle, err := s.Create(ctx, createReq, "", "")
 		if err != nil {
 			errMsg := fmt.Sprintf("导入文章 '%s' 失败: %v", articleData.Title, err)
 			log.Printf("[导入文章] %s", errMsg)

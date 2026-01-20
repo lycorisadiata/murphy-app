@@ -234,7 +234,6 @@ const (
 	KeyCommentAIDetectRiskLevel SettingKey = "comment.ai_detect_risk_level" // 触发处理的风险等级: high(仅高风险), medium(中高风险), low(所有风险)
 	KeyCommentQQAPIURL          SettingKey = "comment.qq_api_url"
 	KeyCommentQQAPIKey          SettingKey = "comment.qq_api_key"
-	KeyCommentQQAPIReferer      SettingKey = "comment.qq_api_referer"
 	KeyCommentNotifyAdmin       SettingKey = "comment.notify_admin"
 	KeyCommentNotifyReply       SettingKey = "comment.notify_reply"
 	KeyPushooChannel            SettingKey = "pushoo.channel"
@@ -371,8 +370,19 @@ const (
 	KeyAlbumPageDefaultThumbParam    SettingKey = "album.default_thumb_param"
 	KeyAlbumPageDefaultBigParam      SettingKey = "album.default_big_param"
 
+	// --- 人机验证配置 ---
+	KeyCaptchaProvider SettingKey = "captcha.provider" // 人机验证方式：turnstile / geetest / image / none
+
 	// --- Cloudflare Turnstile 人机验证配置 ---
-	KeyTurnstileEnable    SettingKey = "turnstile.enable"     // 是否启用 Turnstile 人机验证
+	KeyTurnstileEnable    SettingKey = "turnstile.enable"     // 是否启用 Turnstile 人机验证（已废弃，使用 captcha.provider）
 	KeyTurnstileSiteKey   SettingKey = "turnstile.site_key"   // Turnstile Site Key（公钥，前端使用）
 	KeyTurnstileSecretKey SettingKey = "turnstile.secret_key" // Turnstile Secret Key（私钥，后端验证使用）
+
+	// --- 极验 GeeTest 4.0 人机验证配置 ---
+	KeyGeetestCaptchaId  SettingKey = "geetest.captcha_id"  // 极验验证 ID（公钥，前端使用）
+	KeyGeetestCaptchaKey SettingKey = "geetest.captcha_key" // 极验验证 Key（私钥，后端验证使用）
+
+	// --- 系统图形验证码配置 ---
+	KeyImageCaptchaLength SettingKey = "image_captcha.length" // 图形验证码字符长度
+	KeyImageCaptchaExpire SettingKey = "image_captcha.expire" // 图形验证码过期时间（秒）
 )

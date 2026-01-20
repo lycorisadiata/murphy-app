@@ -276,7 +276,10 @@ func (h *Handler) Create(c *gin.Context) {
 		claims, _ = userClaim.(*auth.CustomClaims)
 	}
 
-	commentDTO, err := h.svc.Create(c.Request.Context(), &req, ip, ua, claims)
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	referer := c.GetHeader("Referer")
+
+	commentDTO, err := h.svc.Create(c.Request.Context(), &req, ip, ua, referer, claims)
 	if err != nil {
 		if errors.Is(err, constant.ErrAdminEmailUsedByGuest) {
 			response.Fail(c, http.StatusForbidden, err.Error())
@@ -533,7 +536,34 @@ func (h *Handler) GetQQInfo(c *gin.Context) {
 		return
 	}
 
-	info, err := h.svc.GetQQInfo(c.Request.Context(), qqNumber)
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	referer := c.GetHeader("Referer")
+
+	info, err := h.svc.GetQQInfo(c.Request.Context(), qqNumber, referer)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, info, "获取成功")
+}
+
+// GetIPLocation
+// @Summary      获取IP定位信息
+// @Description  根据客户端IP地址获取地理位置信息（城市、经纬度等）。用于天气组件等功能。
+// @Tags         公开评论
+// @Produce      json
+// @Success      200 {object} response.Response{data=comment.IPLocationResponse} "成功响应"
+// @Failure      500 {object} response.Response "服务器内部错误"
+// @Router       /public/comments/ip-location [get]
+func (h *Handler) GetIPLocation(c *gin.Context) {
+	// 获取客户端真实 IP
+	clientIP := util.GetRealClientIP(c)
+
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	referer := c.GetHeader("Referer")
+
+	info, err := h.svc.GetIPLocation(c.Request.Context(), clientIP, referer)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return

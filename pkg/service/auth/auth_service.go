@@ -118,8 +118,8 @@ func (s *authService) createDefaultArticle(ctx context.Context) {
 	}
 
 	// 步骤 4: 调用文章服务创建文章
-	// 使用 "system" 作为 IP 地址标识
-	article, err := s.articleSvc.Create(ctx, req, "system")
+	// 使用 "system" 作为 IP 地址标识，系统创建不需要 Referer
+	article, err := s.articleSvc.Create(ctx, req, "system", "")
 	if err != nil {
 		log.Printf("[ERROR] Failed to create default article: %v", err)
 		return

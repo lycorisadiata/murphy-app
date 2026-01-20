@@ -741,8 +741,10 @@ func (s *visitorStatService) batchWriteVisit(ctx context.Context, c *gin.Context
 	// 创建访问日志
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := s.getClientIP(c)
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	httpReferer := c.GetHeader("Referer")
 	visitorID := s.generateVisitorID(clientIP, userAgent)
-	country, region, city := s.getGeoLocation(clientIP)
+	country, region, city := s.getGeoLocation(clientIP, httpReferer)
 	browser, os, device := s.parseUserAgent(userAgent)
 
 	log := &ent.VisitorLog{
@@ -1054,12 +1056,13 @@ func (s *visitorStatService) generateVisitorID(ip, userAgent string) string {
 }
 
 // 获取地理位置信息
-func (s *visitorStatService) getGeoLocation(ip string) (country, region, city string) {
+// referer 参数用于 NSUUU API 白名单验证
+func (s *visitorStatService) getGeoLocation(ip, referer string) (country, region, city string) {
 	if s.geoipService == nil {
 		return "未知", "未知", "未知"
 	}
 
-	location, err := s.geoipService.Lookup(ip)
+	location, err := s.geoipService.Lookup(ip, referer)
 	if err != nil {
 		return "未知", "未知", "未知"
 	}

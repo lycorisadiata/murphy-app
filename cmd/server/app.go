@@ -39,6 +39,7 @@ import (
 	article_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article"
 	article_history_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article_history"
 	auth_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/auth"
+	captcha_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/captcha"
 	comment_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/comment"
 	config_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/config"
 	direct_link_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/direct_link"
@@ -92,6 +93,9 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/theme"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/thumbnail"
 	turnstile_service "github.com/anzhiyu-c/anheyu-app/pkg/service/turnstile"
+	geetest_service "github.com/anzhiyu-c/anheyu-app/pkg/service/geetest"
+	imagecaptcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/imagecaptcha"
+	captcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/captcha"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/user"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/utility"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/volume"
@@ -380,9 +384,8 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	cdnSvc := cdn.NewService(settingSvc)
 	log.Printf("[DEBUG] CDNService 初始化完成")
 
-	// 初始化订阅服务和 Handler (需在 ArticleService 之前初始化)
+	// 初始化订阅服务 (需在 ArticleService 之前初始化，Handler 在 captchaSvc 初始化后创建)
 	subscriberSvc := subscriber_service.NewService(entClient, redisClient, emailSvc)
-	subscriberHandler := subscriber_handler.NewHandler(subscriberSvc)
 
 	articleSvc := article_service.NewService(articleRepo, postTagRepo, postCategoryRepo, commentRepo, docSeriesRepo, pageRepo, txManager, cacheSvc, geoSvc, taskBroker, settingSvc, parserSvc, fileSvc, directLinkSvc, searchSvc, primaryColorSvc, cdnSvc, subscriberSvc, userRepo)
 	// 注入文章历史版本仓储
@@ -423,9 +426,24 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	turnstileSvc := turnstile_service.NewTurnstileService(settingSvc)
 	log.Printf("[DEBUG] TurnstileService 初始化完成")
 
+	// 初始化极验人机验证服务
+	log.Printf("[DEBUG] 正在初始化 GeetestService...")
+	geetestSvc := geetest_service.NewGeetestService(settingSvc)
+	log.Printf("[DEBUG] GeetestService 初始化完成")
+
+	// 初始化图形验证码服务
+	log.Printf("[DEBUG] 正在初始化 ImageCaptchaService...")
+	imageCaptchaSvc := imagecaptcha_service.NewImageCaptchaService(settingSvc, cacheSvc)
+	log.Printf("[DEBUG] ImageCaptchaService 初始化完成")
+
+	// 初始化统一验证服务
+	log.Printf("[DEBUG] 正在初始化 CaptchaService...")
+	captchaSvc := captcha_service.NewCaptchaService(settingSvc, turnstileSvc, geetestSvc, imageCaptchaSvc)
+	log.Printf("[DEBUG] CaptchaService 初始化完成")
+
 	// --- Phase 6: 初始化表现层 (Handlers) ---
 	mw := middleware.NewMiddleware(tokenSvc)
-	authHandler := auth_handler.NewAuthHandler(authSvc, tokenSvc, settingSvc, turnstileSvc)
+	authHandler := auth_handler.NewAuthHandler(authSvc, tokenSvc, settingSvc, captchaSvc)
 	albumHandler := album_handler.NewAlbumHandler(albumSvc)
 	albumCategoryHandler := album_category_handler.NewHandler(albumCategorySvc)
 	userHandler := user_handler.NewUserHandler(userSvc, settingSvc, fileSvc, directLinkSvc)
@@ -453,6 +471,8 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	notificationHandler := notification_handler.NewHandler(notificationSvc)
 	configBackupHandler := config_handler.NewConfigBackupHandler(configBackupSvc)
 	configImportExportHandler := config_handler.NewConfigImportExportHandler(configImportExportSvc)
+	subscriberHandler := subscriber_handler.NewHandler(subscriberSvc, captchaSvc)
+	captchaHandler := captcha_handler.NewHandler(captchaSvc)
 
 	// --- Phase 7: 初始化路由 ---
 	appRouter := router.NewRouter(
@@ -486,6 +506,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		configBackupHandler,
 		configImportExportHandler,
 		subscriberHandler,
+		captchaHandler,
 	)
 
 	// --- Phase 8: 配置 Gin 引擎 ---

@@ -42,9 +42,9 @@ type Service interface {
 	UploadArticleImage(ctx context.Context, ownerID uint, fileReader io.Reader, originalFilename string) (fileURL string, publicFileID string, err error)
 	// UploadArticleImageWithGroup 上传文章图片，并检查用户组权限
 	UploadArticleImageWithGroup(ctx context.Context, ownerID, userGroupID uint, fileReader io.Reader, originalFilename string) (fileURL string, publicFileID string, err error)
-	Create(ctx context.Context, req *model.CreateArticleRequest, ip string) (*model.ArticleResponse, error)
+	Create(ctx context.Context, req *model.CreateArticleRequest, ip, referer string) (*model.ArticleResponse, error)
 	Get(ctx context.Context, publicID string) (*model.ArticleResponse, error)
-	Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip string) (*model.ArticleResponse, error)
+	Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip, referer string) (*model.ArticleResponse, error)
 	Delete(ctx context.Context, publicID string) error
 	BatchDelete(ctx context.Context, publicIDs []string) (*BatchDeleteResult, error)
 	List(ctx context.Context, options *model.ListArticlesOptions) (*model.ArticleListResponse, error)
@@ -940,7 +940,8 @@ func (s *serviceImpl) GetBySlugOrIDForPreview(ctx context.Context, slugOrID stri
 }
 
 // Create 处理创建新文章的完整业务流程。
-func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleRequest, ip string) (*model.ArticleResponse, error) {
+// referer 参数用于 NSUUU API 白名单验证
+func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleRequest, ip, referer string) (*model.ArticleResponse, error) {
 	// 验证 abbrlink（在事务外进行，避免不必要的事务开销）
 	if err := s.validateAbbrlink(ctx, req.Abbrlink, 0); err != nil {
 		return nil, err
@@ -968,7 +969,7 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 				log.Printf("[新增文章] ❌ IP属地设为'未知' - 原因: GeoIP服务未初始化 (IP: %s)", ip)
 			} else {
 				log.Printf("[新增文章] 开始调用GeoIP服务查询IP属地 - IP: %s", ip)
-				location, err := s.geoService.Lookup(ip)
+				location, err := s.geoService.Lookup(ip, referer)
 				if err == nil {
 					ipLocation = location
 					log.Printf("[新增文章]IP属地自动获取成功 - IP: %s, 结果: %s", ip, ipLocation)
@@ -1243,7 +1244,8 @@ func (s *serviceImpl) GetPublicByID(ctx context.Context, publicID string) (*mode
 }
 
 // Update 处理更新文章的业务逻辑。
-func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip string) (*model.ArticleResponse, error) {
+// referer 参数用于 NSUUU API 白名单验证
+func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.UpdateArticleRequest, ip, referer string) (*model.ArticleResponse, error) {
 	// 如果更新了 abbrlink，进行验证
 	if req.Abbrlink != nil {
 		dbID, _, err := idgen.DecodePublicID(publicID)
@@ -1376,7 +1378,7 @@ func (s *serviceImpl) Update(ctx context.Context, publicID string, req *model.Up
 				log.Printf("[更新文章] ❌ IP属地设为'未知' - 原因: GeoIP服务未初始化 (IP: %s)", ip)
 			} else {
 				log.Printf("[更新文章] 开始调用GeoIP服务查询IP属地 - IP: %s", ip)
-				fetchedLocation, err := s.geoService.Lookup(ip)
+				fetchedLocation, err := s.geoService.Lookup(ip, referer)
 				if err == nil {
 					location = fetchedLocation
 					log.Printf("[更新文章]IP属地自动获取成功 - IP: %s, 结果: %s", ip, location)

@@ -216,7 +216,6 @@ var AllSettings = []Definition{
 	{Key: constant.KeyCommentAIDetectRiskLevel, Value: "medium", Comment: "触发处理的最低风险等级: high(仅高风险), medium(中高风险), low(所有风险)", IsPublic: false},
 	{Key: constant.KeyCommentQQAPIURL, Value: "https://v1.nsuuu.com/api/qqname", Comment: "QQ信息查询API地址", IsPublic: false},
 	{Key: constant.KeyCommentQQAPIKey, Value: "", Comment: "QQ信息查询API密钥", IsPublic: false},
-	{Key: constant.KeyCommentQQAPIReferer, Value: "", Comment: "QQ信息查询API的Referer白名单值（需与v1.nsuuu.com控制面板配置一致）", IsPublic: true},
 	{Key: constant.KeyCommentNotifyAdmin, Value: "false", Comment: "是否在收到评论时邮件通知博主", IsPublic: false},
 	{Key: constant.KeyCommentNotifyReply, Value: "true", Comment: "是否开启评论回复邮件通知功能", IsPublic: false},
 	{Key: constant.KeyPushooChannel, Value: "", Comment: "即时消息推送平台名称，支持：bark, webhook", IsPublic: false},
@@ -476,10 +475,21 @@ var AllSettings = []Definition{
 	{Key: constant.KeyAlbumPageDefaultThumbParam, Value: "", Comment: "相册缩略图处理参数", IsPublic: true},
 	{Key: constant.KeyAlbumPageDefaultBigParam, Value: "", Comment: "相册大图处理参数", IsPublic: true},
 
+	// --- 人机验证配置 ---
+	{Key: constant.KeyCaptchaProvider, Value: "none", Comment: "人机验证方式: none(不启用) / turnstile(Cloudflare Turnstile) / geetest(极验4.0) / image(系统图形验证码)", IsPublic: true},
+
 	// --- Cloudflare Turnstile 人机验证配置 ---
-	{Key: constant.KeyTurnstileEnable, Value: "false", Comment: "是否启用 Cloudflare Turnstile 人机验证 (true/false)", IsPublic: true},
+	{Key: constant.KeyTurnstileEnable, Value: "false", Comment: "是否启用 Cloudflare Turnstile 人机验证 (true/false)，已废弃，请使用 captcha.provider", IsPublic: true},
 	{Key: constant.KeyTurnstileSiteKey, Value: "", Comment: "Turnstile Site Key（公钥，前端使用，从 Cloudflare 控制台获取）", IsPublic: true},
 	{Key: constant.KeyTurnstileSecretKey, Value: "", Comment: "Turnstile Secret Key（私钥，后端验证使用，从 Cloudflare 控制台获取）", IsPublic: false},
+
+	// --- 极验 GeeTest 4.0 人机验证配置 ---
+	{Key: constant.KeyGeetestCaptchaId, Value: "", Comment: "极验验证 ID（公钥，前端使用，从极验后台获取）", IsPublic: true},
+	{Key: constant.KeyGeetestCaptchaKey, Value: "", Comment: "极验验证 Key（私钥，后端验证使用，从极验后台获取）", IsPublic: false},
+
+	// --- 系统图形验证码配置 ---
+	{Key: constant.KeyImageCaptchaLength, Value: "4", Comment: "图形验证码字符长度 (默认4位)", IsPublic: true},
+	{Key: constant.KeyImageCaptchaExpire, Value: "300", Comment: "图形验证码过期时间（秒，默认300秒/5分钟）", IsPublic: true},
 }
 
 // AllUserGroups 是所有默认用户组的"单一事实来源"

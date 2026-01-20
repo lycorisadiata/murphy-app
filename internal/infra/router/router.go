@@ -17,6 +17,7 @@ import (
 	article_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article"
 	article_history_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/article_history"
 	auth_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/auth"
+	captcha_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/captcha"
 	comment_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/comment"
 	config_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/config"
 	direct_link_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/direct_link"
@@ -90,6 +91,7 @@ type Router struct {
 	configBackupHandler       *config_handler.ConfigBackupHandler
 	configImportExportHandler *config_handler.ConfigImportExportHandler
 	subscriberHandler         *subscriber_handler.Handler
+	captchaHandler            *captcha_handler.Handler
 }
 
 // NewRouter 是 Router 的构造函数，通过依赖注入接收所有处理器。
@@ -124,6 +126,7 @@ func NewRouter(
 	configBackupHandler *config_handler.ConfigBackupHandler,
 	configImportExportHandler *config_handler.ConfigImportExportHandler,
 	subscriberHandler *subscriber_handler.Handler,
+	captchaHandler *captcha_handler.Handler,
 ) *Router {
 	return &Router{
 		authHandler:               authHandler,
@@ -156,6 +159,7 @@ func NewRouter(
 		configBackupHandler:       configBackupHandler,
 		configImportExportHandler: configImportExportHandler,
 		subscriberHandler:         subscriberHandler,
+		captchaHandler:            captchaHandler,
 	}
 }
 
@@ -220,7 +224,8 @@ func (r *Router) registerCommentRoutes(api *gin.RouterGroup) {
 
 		commentsPublic.GET("/:id/children", r.commentHandler.ListChildren)
 
-		commentsPublic.GET("/qq-info", r.commentHandler.GetQQInfo) // 获取QQ昵称和头像
+		commentsPublic.GET("/qq-info", r.commentHandler.GetQQInfo)         // 获取QQ昵称和头像
+		commentsPublic.GET("/ip-location", r.commentHandler.GetIPLocation) // 获取IP定位信息（用于天气组件）
 
 		commentsPublic.POST("", r.mw.JWTAuthOptional(), r.commentHandler.Create)
 		commentsPublic.POST("/upload", r.mw.JWTAuthOptional(), r.commentHandler.UploadCommentImage)
@@ -461,6 +466,10 @@ func (r *Router) registerPublicRoutes(api *gin.RouterGroup) {
 		public.GET("/album-categories", r.publicHandler.GetPublicAlbumCategories)
 		public.PUT("/stat/:id", r.publicHandler.UpdateAlbumStat)
 		public.GET("/site-config", r.settingHandler.GetSiteConfig)
+
+		// 验证码相关路由
+		public.GET("/captcha/config", r.captchaHandler.GetConfig)
+		public.GET("/captcha/image", middleware.CustomRateLimit(10, 10), r.captchaHandler.GenerateImage)
 
 		// 订阅相关路由
 		public.POST("/subscribe", middleware.CustomRateLimit(3, 3), r.subscriberHandler.Subscribe)

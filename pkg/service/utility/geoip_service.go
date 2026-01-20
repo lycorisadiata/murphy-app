@@ -21,8 +21,26 @@ import (
 
 // GeoIPService 定义了 IP 地理位置查询服务的统一接口。
 type GeoIPService interface {
-	Lookup(ipString string) (location string, err error)
+	// Lookup 查询 IP 地址的地理位置
+	// ipString: 要查询的 IP 地址
+	// referer: 客户端请求的 Referer，用于 NSUUU API 白名单验证
+	Lookup(ipString string, referer string) (location string, err error)
+	// LookupFull 查询 IP 地址的完整地理位置信息（包含经纬度）
+	LookupFull(ipString string, referer string) (*GeoIPResult, error)
 	Close()
+}
+
+// GeoIPResult 完整的 IP 地理位置查询结果
+// 与 NSUUU ipip API 响应结构一致
+type GeoIPResult struct {
+	IP        string `json:"ip"`
+	Country   string `json:"country"`
+	Province  string `json:"province"`
+	City      string `json:"city"`
+	ISP       string `json:"isp"`
+	Latitude  string `json:"latitude"`
+	Longitude string `json:"longitude"`
+	Address   string `json:"address"` // API 原始返回的地址字段
 }
 
 // apiResponse 定义了远程 IP API 返回的 JSON 数据的结构。
@@ -69,8 +87,9 @@ func NewGeoIPService(settingSvc setting.SettingService) (GeoIPService, error) {
 }
 
 // Lookup 是核心的查询方法，只通过 API 进行。
-func (s *smartGeoIPService) Lookup(ipStr string) (string, error) {
-	log.Printf("[IP属地查询] 开始查询IP地址: %s", ipStr)
+// referer 参数用于传递客户端请求的 Referer，以通过 NSUUU API 的白名单验证
+func (s *smartGeoIPService) Lookup(ipStr string, referer string) (string, error) {
+	log.Printf("[IP属地查询] 开始查询IP地址: %s, Referer: %s", ipStr, referer)
 
 	apiURL := s.settingSvc.Get(constant.KeyIPAPI.String())
 	apiToken := s.settingSvc.Get(constant.KeyIPAPIToKen.String())
@@ -84,7 +103,7 @@ func (s *smartGeoIPService) Lookup(ipStr string) (string, error) {
 
 	log.Printf("[IP属地查询] API配置检查通过 - URL: %s, Token已配置: %t", apiURL, apiToken != "")
 
-	location, err := s.lookupViaAPI(apiURL, apiToken, ipStr)
+	location, err := s.lookupViaAPI(apiURL, apiToken, ipStr, referer)
 	if err != nil {
 		// 记录错误，但返回统一的"未知"给上层调用者
 		log.Printf("[IP属地查询] ❌ IP属地最终结果为'未知' - IP: %s, API调用失败: %v", ipStr, err)
@@ -97,7 +116,8 @@ func (s *smartGeoIPService) Lookup(ipStr string) (string, error) {
 
 // lookupViaAPI 封装了调用远程 API 的逻辑。
 // 使用 NSUUU ipv1 API，支持 Bearer Token 认证方式
-func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string, error) {
+// referer 参数用于设置 Referer 请求头，以通过 NSUUU API 的白名单验证
+func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr, referer string) (string, error) {
 	// 构建请求URL，只包含ip参数，key通过Header传递
 	reqURL := fmt.Sprintf("%s?ip=%s", apiURL, ipStr)
 
@@ -111,6 +131,12 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string
 
 	// 使用 Bearer Token 方式传递 API Key（推荐方式，更安全）
 	req.Header.Set("Authorization", "Bearer "+apiToken)
+
+	// 设置 Referer 请求头，用于 NSUUU API 的白名单验证
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+		log.Printf("[IP属地查询] 设置 Referer 请求头: %s", referer)
+	}
 
 	log.Printf("[IP属地查询] 发送HTTP请求到第三方API（使用Bearer Token认证）...")
 	resp, err := s.httpClient.Do(req)
@@ -133,12 +159,15 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string
 		return "", fmt.Errorf("读取响应体失败: %w", err)
 	}
 
-	// 1. 尝试解析为apiKeyErrorResponse
+	// 打印 API 原始返回内容，便于调试
+	log.Printf("[IP属地查询] API原始返回内容 - IP: %s, 响应体: %s", ipStr, string(body))
+
+	// 1. 尝试解析为apiKeyErrorResponse（检查是否是 API KEY 错误）
 	var keyErrorResult apiKeyErrorResponse
-	if err := json.Unmarshal(body, &keyErrorResult); err == nil {
-		// 如果能解析成功，说明是API KEY错误
-		log.Printf("[IP属地查询] ❌ API KEY错误 - IP: %s", ipStr)
-		return "", fmt.Errorf("API KEY配置错误")
+	if err := json.Unmarshal(body, &keyErrorResult); err == nil && keyErrorResult.Code < 0 {
+		// 只有当解析成功且 Code 为负数时才认为是 API KEY 错误
+		log.Printf("[IP属地查询] ❌ API KEY错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, keyErrorResult.Code, keyErrorResult.Msg)
+		return "", fmt.Errorf("API KEY配置错误: %s", keyErrorResult.Msg)
 	}
 
 	// 2. 上述错误结构无法解析，尝试解析为正常响应
@@ -181,6 +210,68 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr string) (string
 	}
 
 	return finalLocation, nil
+}
+
+// LookupFull 查询 IP 地址的完整地理位置信息（包含经纬度）
+// referer 参数用于传递客户端请求的 Referer，以通过 NSUUU API 的白名单验证
+func (s *smartGeoIPService) LookupFull(ipStr string, referer string) (*GeoIPResult, error) {
+	log.Printf("[IP属地查询-完整] 开始查询IP地址: %s, Referer: %s", ipStr, referer)
+
+	apiURL := s.settingSvc.Get(constant.KeyIPAPI.String())
+	apiToken := s.settingSvc.Get(constant.KeyIPAPIToKen.String())
+
+	if apiURL == "" || apiToken == "" {
+		log.Printf("[IP属地查询-完整] ❌ 远程API未配置")
+		return nil, fmt.Errorf("IP 查询失败：远程 API 未配置")
+	}
+
+	// 构建请求URL
+	reqURL := fmt.Sprintf("%s?ip=%s", apiURL, ipStr)
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建 API 请求失败: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiToken)
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API 请求网络错误: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API 返回非 200 状态码: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应体失败: %w", err)
+	}
+
+	var result apiResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("解析API响应JSON失败: %w", err)
+	}
+
+	if result.Code != 200 {
+		return nil, fmt.Errorf("API 返回业务错误码: %d, 信息: %s", result.Code, result.Message)
+	}
+
+	return &GeoIPResult{
+		IP:        result.Data.IP,
+		Country:   result.Data.Country,
+		Province:  result.Data.Province,
+		City:      result.Data.City,
+		ISP:       result.Data.ISP,
+		Latitude:  result.Data.Latitude,
+		Longitude: result.Data.Longitude,
+		Address:   result.Data.Address,
+	}, nil
 }
 
 // Close 在这个实现中不需要做任何事，但为了满足接口要求而保留。

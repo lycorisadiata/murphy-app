@@ -240,10 +240,12 @@ func (h *Handler) Create(c *gin.Context) {
 
 	// 使用改进的IP获取方法，优先检查代理头部
 	clientIP := util.GetRealClientIP(c)
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	referer := c.GetHeader("Referer")
 
-	// 调用 Service 时传递 IP 地址
+	// 调用 Service 时传递 IP 地址和 Referer
 	log.Printf("[Handler.Create] 调用 Service.Create...")
-	article, err := h.svc.Create(c.Request.Context(), &req, clientIP)
+	article, err := h.svc.Create(c.Request.Context(), &req, clientIP, referer)
 	if err != nil {
 		log.Printf("[Handler.Create] ❌ Service.Create 失败: %v", err)
 		response.Fail(c, http.StatusInternalServerError, "创建文章失败: "+err.Error())
@@ -361,11 +363,13 @@ func (h *Handler) Update(c *gin.Context) {
 
 	// 使用改进的IP获取方法，优先检查代理头部
 	clientIP := util.GetRealClientIP(c)
+	// 获取客户端 Referer，用于 NSUUU API 白名单验证
+	referer := c.GetHeader("Referer")
 	log.Printf("[Handler.Update] 准备更新文章，获取到的真实 IP 是: %s", clientIP)
 
-	// 将 clientIP 传递给 Service 层
+	// 将 clientIP 和 Referer 传递给 Service 层
 	log.Printf("[Handler.Update] 调用 Service.Update...")
-	article, err := h.svc.Update(c.Request.Context(), id, &req, clientIP)
+	article, err := h.svc.Update(c.Request.Context(), id, &req, clientIP, referer)
 	if err != nil {
 		log.Printf("[Handler.Update] ❌ Service.Update 失败: %v", err)
 		response.Fail(c, http.StatusInternalServerError, "更新文章失败: "+err.Error())

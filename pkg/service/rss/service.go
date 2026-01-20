@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -66,10 +65,8 @@ func (s *service) GenerateFeed(ctx context.Context, opts *RSSOptions) (*RSSFeed,
 	if cachedData, err := s.cacheSvc.Get(ctx, rssCacheKey); err == nil && cachedData != "" {
 		var feed RSSFeed
 		if err := json.Unmarshal([]byte(cachedData), &feed); err == nil {
-			log.Printf("[RSS] 从缓存获取 RSS feed，包含 %d 篇文章", len(feed.Items))
 			return &feed, nil
 		}
-		log.Printf("[RSS] 缓存数据解析失败: %v，将重新生成", err)
 	}
 
 	// 获取站点配置
@@ -92,7 +89,6 @@ func (s *service) GenerateFeed(ctx context.Context, opts *RSSOptions) (*RSSFeed,
 
 	articlesResp, err := s.articleSvc.ListPublic(ctx, options)
 	if err != nil {
-		log.Printf("[RSS] 获取文章列表失败: %v", err)
 		return nil, fmt.Errorf("获取文章列表失败: %w", err)
 	}
 
@@ -115,25 +111,15 @@ func (s *service) GenerateFeed(ctx context.Context, opts *RSSOptions) (*RSSFeed,
 
 	// 缓存生成的 feed
 	if feedData, err := json.Marshal(feed); err == nil {
-		if err := s.cacheSvc.Set(ctx, rssCacheKey, string(feedData), rssCacheTTL*time.Second); err != nil {
-			log.Printf("[RSS] 缓存 RSS feed 失败: %v", err)
-		} else {
-			log.Printf("[RSS] 成功缓存 RSS feed")
-		}
+		_ = s.cacheSvc.Set(ctx, rssCacheKey, string(feedData), rssCacheTTL*time.Second)
 	}
 
-	log.Printf("[RSS] 成功生成 RSS feed，包含 %d 篇文章", len(feed.Items))
 	return feed, nil
 }
 
 // InvalidateCache 清除 RSS 缓存
 func (s *service) InvalidateCache(ctx context.Context) error {
-	if err := s.cacheSvc.Delete(ctx, rssCacheKey); err != nil {
-		log.Printf("[RSS] 清除 RSS 缓存失败: %v", err)
-		return err
-	}
-	log.Printf("[RSS] 成功清除 RSS 缓存")
-	return nil
+	return s.cacheSvc.Delete(ctx, rssCacheKey)
 }
 
 // buildRSSItem 构建单个 RSS 条目

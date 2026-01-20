@@ -10,35 +10,49 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/idgen"
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/auth"
+	"github.com/anzhiyu-c/anheyu-app/pkg/service/captcha"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/setting"
-	"github.com/anzhiyu-c/anheyu-app/pkg/service/turnstile"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler 封装了所有认证相关的控制器方法
 type AuthHandler struct {
-	authSvc      auth.AuthService
-	tokenSvc     auth.TokenService
-	settingSvc   setting.SettingService
-	turnstileSvc turnstile.TurnstileService
+	authSvc    auth.AuthService
+	tokenSvc   auth.TokenService
+	settingSvc setting.SettingService
+	captchaSvc captcha.CaptchaService
 }
 
 // NewAuthHandler 是 AuthHandler 的构造函数，用于依赖注入
-func NewAuthHandler(authSvc auth.AuthService, tokenSvc auth.TokenService, settingSvc setting.SettingService, turnstileSvc turnstile.TurnstileService) *AuthHandler {
+func NewAuthHandler(authSvc auth.AuthService, tokenSvc auth.TokenService, settingSvc setting.SettingService, captchaSvc captcha.CaptchaService) *AuthHandler {
 	return &AuthHandler{
-		authSvc:      authSvc,
-		tokenSvc:     tokenSvc,
-		settingSvc:   settingSvc,
-		turnstileSvc: turnstileSvc,
+		authSvc:    authSvc,
+		tokenSvc:   tokenSvc,
+		settingSvc: settingSvc,
+		captchaSvc: captchaSvc,
 	}
+}
+
+// CaptchaParams 统一验证码参数（嵌入到请求中）
+type CaptchaParams struct {
+	// Turnstile 参数
+	TurnstileToken string `json:"turnstile_token,omitempty"`
+	// 极验参数
+	GeetestLotNumber     string `json:"geetest_lot_number,omitempty"`
+	GeetestCaptchaOutput string `json:"geetest_captcha_output,omitempty"`
+	GeetestPassToken     string `json:"geetest_pass_token,omitempty"`
+	GeetestGenTime       string `json:"geetest_gen_time,omitempty"`
+	// 系统验证码参数
+	ImageCaptchaId     string `json:"image_captcha_id,omitempty"`
+	ImageCaptchaAnswer string `json:"image_captcha_answer,omitempty"`
 }
 
 // LoginRequest 定义了登录请求的结构
 type LoginRequest struct {
-	Email          string `json:"email" binding:"required,email"`
-	Password       string `json:"password" binding:"required"`
-	TurnstileToken string `json:"turnstile_token"` // Cloudflare Turnstile 验证 token
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
+	CaptchaParams
 }
 
 // RegisterRequest 定义了注册请求的结构
@@ -47,7 +61,7 @@ type RegisterRequest struct {
 	Nickname       string `json:"nickname" binding:"required"`
 	Password       string `json:"password" binding:"required,min=6"`
 	RepeatPassword string `json:"repeat_password" binding:"required"`
-	TurnstileToken string `json:"turnstile_token"` // Cloudflare Turnstile 验证 token
+	CaptchaParams
 }
 
 // RefreshTokenRequest 定义了刷新令牌请求的结构
@@ -64,6 +78,7 @@ type ActivateUserRequest struct {
 // ForgotPasswordRequest 定义了忘记密码请求的结构
 type ForgotPasswordRequest struct {
 	Email string `json:"email" binding:"required,email"`
+	CaptchaParams
 }
 
 // ResetPasswordRequest 定义了重置密码请求的结构
@@ -116,8 +131,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// 0. 验证 Turnstile 人机验证（如果启用）
-	if err := h.turnstileSvc.Verify(c.Request.Context(), req.TurnstileToken, c.ClientIP()); err != nil {
+	// 0. 验证人机验证（如果启用）
+	captchaParams := captcha.CaptchaParams{
+		TurnstileToken:       req.TurnstileToken,
+		GeetestLotNumber:     req.GeetestLotNumber,
+		GeetestCaptchaOutput: req.GeetestCaptchaOutput,
+		GeetestPassToken:     req.GeetestPassToken,
+		GeetestGenTime:       req.GeetestGenTime,
+		ImageCaptchaId:       req.ImageCaptchaId,
+		ImageCaptchaAnswer:   req.ImageCaptchaAnswer,
+	}
+	if err := h.captchaSvc.Verify(c.Request.Context(), captchaParams, c.ClientIP()); err != nil {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -212,8 +236,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// 验证 Turnstile 人机验证（如果启用）
-	if err := h.turnstileSvc.Verify(c.Request.Context(), req.TurnstileToken, c.ClientIP()); err != nil {
+	// 验证人机验证（如果启用）
+	captchaParams := captcha.CaptchaParams{
+		TurnstileToken:       req.TurnstileToken,
+		GeetestLotNumber:     req.GeetestLotNumber,
+		GeetestCaptchaOutput: req.GeetestCaptchaOutput,
+		GeetestPassToken:     req.GeetestPassToken,
+		GeetestGenTime:       req.GeetestGenTime,
+		ImageCaptchaId:       req.ImageCaptchaId,
+		ImageCaptchaAnswer:   req.ImageCaptchaAnswer,
+	}
+	if err := h.captchaSvc.Verify(c.Request.Context(), captchaParams, c.ClientIP()); err != nil {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -389,6 +422,22 @@ func (h *AuthHandler) ForgotPasswordRequest(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "邮箱格式不正确")
 		return
 	}
+
+	// 验证人机验证（如果启用）
+	captchaParams := captcha.CaptchaParams{
+		TurnstileToken:       req.TurnstileToken,
+		GeetestLotNumber:     req.GeetestLotNumber,
+		GeetestCaptchaOutput: req.GeetestCaptchaOutput,
+		GeetestPassToken:     req.GeetestPassToken,
+		GeetestGenTime:       req.GeetestGenTime,
+		ImageCaptchaId:       req.ImageCaptchaId,
+		ImageCaptchaAnswer:   req.ImageCaptchaAnswer,
+	}
+	if err := h.captchaSvc.Verify(c.Request.Context(), captchaParams, c.ClientIP()); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// 调用 service，无论用户是否存在，都返回成功，防止邮箱枚举攻击
 	h.authSvc.RequestPasswordReset(c.Request.Context(), req.Email)
 	response.Success(c, nil, "如果该邮箱已注册，您将会收到一封密码重置邮件。")

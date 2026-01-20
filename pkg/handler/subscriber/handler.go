@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
+	"github.com/anzhiyu-c/anheyu-app/pkg/service/captcha"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/subscriber"
 
 	"github.com/gin-gonic/gin"
@@ -12,12 +13,16 @@ import (
 
 // Handler 订阅功能处理器
 type Handler struct {
-	svc *subscriber.Service
+	svc        *subscriber.Service
+	captchaSvc captcha.CaptchaService
 }
 
 // NewHandler 创建订阅处理器实例
-func NewHandler(svc *subscriber.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *subscriber.Service, captchaSvc captcha.CaptchaService) *Handler {
+	return &Handler{
+		svc:        svc,
+		captchaSvc: captchaSvc,
+	}
 }
 
 // SubscribeRequest 订阅请求
@@ -126,9 +131,24 @@ func (h *Handler) UnsubscribeByToken(c *gin.Context) {
 	response.Success(c, nil, "退订成功")
 }
 
+// CaptchaParams 统一验证码参数
+type CaptchaParams struct {
+	// Turnstile 参数
+	TurnstileToken string `json:"turnstile_token,omitempty"`
+	// 极验参数
+	GeetestLotNumber     string `json:"geetest_lot_number,omitempty"`
+	GeetestCaptchaOutput string `json:"geetest_captcha_output,omitempty"`
+	GeetestPassToken     string `json:"geetest_pass_token,omitempty"`
+	GeetestGenTime       string `json:"geetest_gen_time,omitempty"`
+	// 系统验证码参数
+	ImageCaptchaId     string `json:"image_captcha_id,omitempty"`
+	ImageCaptchaAnswer string `json:"image_captcha_answer,omitempty"`
+}
+
 // SendVerificationCodeRequest 发送验证码请求
 type SendVerificationCodeRequest struct {
 	Email string `json:"email" binding:"required,email"`
+	CaptchaParams
 }
 
 // SendVerificationCode
@@ -146,6 +166,21 @@ func (h *Handler) SendVerificationCode(c *gin.Context) {
 	var req SendVerificationCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Fail(c, http.StatusBadRequest, "请输入有效的邮箱地址")
+		return
+	}
+
+	// 验证人机验证（如果启用）
+	captchaParams := captcha.CaptchaParams{
+		TurnstileToken:       req.TurnstileToken,
+		GeetestLotNumber:     req.GeetestLotNumber,
+		GeetestCaptchaOutput: req.GeetestCaptchaOutput,
+		GeetestPassToken:     req.GeetestPassToken,
+		GeetestGenTime:       req.GeetestGenTime,
+		ImageCaptchaId:       req.ImageCaptchaId,
+		ImageCaptchaAnswer:   req.ImageCaptchaAnswer,
+	}
+	if err := h.captchaSvc.Verify(c.Request.Context(), captchaParams, c.ClientIP()); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
 

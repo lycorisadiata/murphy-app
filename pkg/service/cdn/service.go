@@ -388,13 +388,14 @@ func (s *serviceImpl) purgeAliyunESACache(ctx context.Context, urls []string) er
 
 	// 阿里云ESA API地址
 	host := "esa.cn-hangzhou.aliyuncs.com"
-	action := "PurgeObjectCaches"
+	action := "PurgeCaches" // 正确的API名称是 PurgeCaches，不是 PurgeObjectCaches
 	version := "2024-09-10"
 
 	// 构建请求参数
+	// Type: file-文件刷新, directory-目录刷新, hostheader-主机头刷新, ignoreParams-忽略参数刷新, cachetag-标签刷新, prefetch-预热
 	params := map[string]interface{}{
 		"SiteId":  siteID,
-		"Type":    "purge_url",
+		"Type":    "file",                   // 使用 file 类型进行 URL 文件刷新
 		"Content": strings.Join(urls, "\n"), // 每个URL一行
 	}
 
