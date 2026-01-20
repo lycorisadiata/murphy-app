@@ -9,7 +9,8 @@ import (
 )
 
 // GetRealClientIP 获取客户端真实IP地址
-// 优先级：X-Forwarded-For > X-Real-IP > X-Original-Forwarded-For > RemoteAddr
+// 优先级：X-Forwarded-For > X-Real-IP > X-Original-Forwarded-For > CF-Connecting-IP > EO-Connecting-IP > Ali-CDN-Real-IP > 其他 > RemoteAddr
+// 支持的 CDN: Cloudflare, 腾讯云 EdgeOne, 阿里云 CDN/ESA 等
 func GetRealClientIP(c *gin.Context) string {
 	// 1. 检查 X-Forwarded-For 头部（最常用的代理头部）
 	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
@@ -51,7 +52,25 @@ func GetRealClientIP(c *gin.Context) string {
 		}
 	}
 
-	// 5. 检查所有可能的头部（包括非标准的）
+	// 5. 检查 EO-Connecting-IP 头部（腾讯云 EdgeOne 使用）
+	if eoIP := c.GetHeader("EO-Connecting-IP"); eoIP != "" {
+		eoIP = strings.TrimSpace(eoIP)
+		// 验证IP格式
+		if ip := net.ParseIP(eoIP); ip != nil {
+			return eoIP
+		}
+	}
+
+	// 6. 检查 Ali-CDN-Real-IP 头部（阿里云 CDN/ESA 使用）
+	if aliIP := c.GetHeader("Ali-CDN-Real-IP"); aliIP != "" {
+		aliIP = strings.TrimSpace(aliIP)
+		// 验证IP格式
+		if ip := net.ParseIP(aliIP); ip != nil {
+			return aliIP
+		}
+	}
+
+	// 7. 检查所有可能的头部（包括非标准的）
 	possibleHeaders := []string{
 		"True-Client-IP",
 		"X-Client-IP",
@@ -74,7 +93,7 @@ func GetRealClientIP(c *gin.Context) string {
 		}
 	}
 
-	// 6. 最后使用Gin内置的ClientIP方法（会检查RemoteAddr）
+	// 8. 最后使用Gin内置的ClientIP方法（会检查RemoteAddr）
 	return c.ClientIP()
 }
 
