@@ -373,11 +373,17 @@ func (rs *RedisSearcher) IndexArticle(ctx context.Context, article *model.Articl
 		}
 	}
 
+	// 获取作者名称：优先使用文章的版权作者，其次使用站点所有者名称
+	author := article.CopyrightAuthor
+	if author == "" {
+		author = rs.settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String())
+	}
+
 	articleData := map[string]interface{}{
 		"id":            article.ID,
 		"title":         article.Title,
 		"content":       article.ContentHTML,
-		"author":        rs.settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String()),
+		"author":        author,
 		"category":      category,
 		"publish_date":  article.CreatedAt.Format(time.RFC3339),
 		"cover_url":     article.CoverURL,

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/anzhiyu-c/anheyu-app/internal/pkg/auth"
+	"github.com/anzhiyu-c/anheyu-app/internal/pkg/utils"
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
 	"github.com/anzhiyu-c/anheyu-app/pkg/idgen"
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
@@ -125,7 +126,7 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 	// 5. 构建响应体，仅暴露必要信息和公共ID
 	var lastLoginAtStr *string
 	if user.LastLoginAt != nil {
-		t := user.LastLoginAt.Format("2006-01-02 15:04:05") // 格式化时间
+		t := utils.ToChina(*user.LastLoginAt).Format("2006-01-02 15:04:05") // 格式化时间（转换为中国时区）
 		lastLoginAtStr = &t
 	}
 
@@ -141,8 +142,8 @@ func (h *UserHandler) GetUserInfo(c *gin.Context) {
 
 	resp := GetUserInfoResponse{
 		ID:          publicUserID,
-		CreatedAt:   user.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   user.UpdatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:   utils.ToChina(user.CreatedAt).Format("2006-01-02 15:04:05"),
+		UpdatedAt:   utils.ToChina(user.UpdatedAt).Format("2006-01-02 15:04:05"),
 		Username:    user.Username,
 		Nickname:    user.Nickname,
 		Avatar:      avatar,
@@ -364,7 +365,7 @@ func (h *UserHandler) AdminListUsers(c *gin.Context) {
 
 		var lastLoginAtStr *string
 		if user.LastLoginAt != nil {
-			t := user.LastLoginAt.Format("2006-01-02 15:04:05")
+			t := utils.ToChina(*user.LastLoginAt).Format("2006-01-02 15:04:05")
 			lastLoginAtStr = &t
 		}
 
@@ -376,8 +377,8 @@ func (h *UserHandler) AdminListUsers(c *gin.Context) {
 
 		userDTOs[i] = AdminUserDTO{
 			ID:          publicUserID,
-			CreatedAt:   user.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   user.UpdatedAt.Format("2006-01-02 15:04:05"),
+			CreatedAt:   utils.ToChina(user.CreatedAt).Format("2006-01-02 15:04:05"),
+			UpdatedAt:   utils.ToChina(user.UpdatedAt).Format("2006-01-02 15:04:05"),
 			Username:    user.Username,
 			Nickname:    user.Nickname,
 			Avatar:      avatar,
@@ -459,7 +460,7 @@ func (h *UserHandler) AdminCreateUser(c *gin.Context) {
 
 	var lastLoginAtStr *string
 	if user.LastLoginAt != nil {
-		t := user.LastLoginAt.Format("2006-01-02 15:04:05")
+		t := utils.ToChina(*user.LastLoginAt).Format("2006-01-02 15:04:05")
 		lastLoginAtStr = &t
 	}
 
@@ -472,8 +473,8 @@ func (h *UserHandler) AdminCreateUser(c *gin.Context) {
 
 	userDTO := AdminUserDTO{
 		ID:          publicUserID,
-		CreatedAt:   user.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   user.UpdatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:   utils.ToChina(user.CreatedAt).Format("2006-01-02 15:04:05"),
+		UpdatedAt:   utils.ToChina(user.UpdatedAt).Format("2006-01-02 15:04:05"),
 		Username:    user.Username,
 		Nickname:    user.Nickname,
 		Avatar:      avatar,

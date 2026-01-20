@@ -259,13 +259,26 @@ func (s *serviceImpl) ImportArticles(ctx context.Context, req *ImportArticleRequ
 	for idx, articleData := range req.Data.Articles {
 		log.Printf("[导入文章] 处理第 %d/%d 篇文章: %s", idx+1, result.TotalCount, articleData.Title)
 
-		// 检查是否已存在（通过标题或 abbrlink）
-		if req.SkipExisting && articleData.Abbrlink != "" {
-			existing, err := s.repo.GetBySlugOrID(ctx, articleData.Abbrlink)
-			if err == nil && existing != nil {
-				log.Printf("[导入文章] 跳过已存在的文章: %s (abbrlink: %s)", articleData.Title, articleData.Abbrlink)
-				result.SkippedCount++
-				continue
+		// 检查是否已存在（通过 abbrlink 或标题）
+		if req.SkipExisting {
+			// 优先通过 abbrlink 检查
+			if articleData.Abbrlink != "" {
+				exists, err := s.repo.ExistsByAbbrlink(ctx, articleData.Abbrlink, 0)
+				if err == nil && exists {
+					log.Printf("[导入文章] 跳过已存在的文章: %s (abbrlink: %s)", articleData.Title, articleData.Abbrlink)
+					result.SkippedCount++
+					continue
+				}
+			}
+
+			// 通过标题检查
+			if articleData.Title != "" {
+				exists, err := s.repo.ExistsByTitle(ctx, articleData.Title, 0)
+				if err == nil && exists {
+					log.Printf("[导入文章] 跳过已存在的文章: %s (标题相同)", articleData.Title)
+					result.SkippedCount++
+					continue
+				}
 			}
 		}
 

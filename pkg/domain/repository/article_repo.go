@@ -90,4 +90,8 @@ type ArticleRepository interface {
 	// ExistsByAbbrlink 检查 abbrlink 是否已被其他文章使用
 	// excludeDBID 为 0 时检查所有文章，否则排除指定 ID 的文章
 	ExistsByAbbrlink(ctx context.Context, abbrlink string, excludeDBID uint) (bool, error)
+
+	// ExistsByTitle 检查标题是否已被其他文章使用
+	// excludeDBID 为 0 时检查所有文章，否则排除指定 ID 的文章
+	ExistsByTitle(ctx context.Context, title string, excludeDBID uint) (bool, error)
 }

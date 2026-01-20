@@ -122,7 +122,7 @@ func (r *articleRepo) toModel(a *ent.Article) *model.Article {
 
 // convertExtraConfig 将数据库中的 map[string]interface{} 转换为 ArticleExtraConfig
 func convertExtraConfig(config map[string]interface{}) *model.ArticleExtraConfig {
-	if config == nil || len(config) == 0 {
+	if len(config) == 0 {
 		return nil
 	}
 	result := &model.ArticleExtraConfig{}
@@ -1062,6 +1062,30 @@ func (r *articleRepo) ExistsByAbbrlink(ctx context.Context, abbrlink string, exc
 	exists, err := query.Exist(ctx)
 	if err != nil {
 		return false, fmt.Errorf("检查 abbrlink 是否存在失败: %w", err)
+	}
+
+	return exists, nil
+}
+
+// ExistsByTitle 检查标题是否已被其他文章使用
+func (r *articleRepo) ExistsByTitle(ctx context.Context, title string, excludeDBID uint) (bool, error) {
+	if title == "" {
+		return false, nil
+	}
+
+	query := r.db.Article.Query().
+		Where(
+			article.TitleEQ(title),
+			article.DeletedAtIsNil(),
+		)
+
+	if excludeDBID > 0 {
+		query = query.Where(article.IDNEQ(excludeDBID))
+	}
+
+	exists, err := query.Exist(ctx)
+	if err != nil {
+		return false, fmt.Errorf("检查标题是否存在失败: %w", err)
 	}
 
 	return exists, nil

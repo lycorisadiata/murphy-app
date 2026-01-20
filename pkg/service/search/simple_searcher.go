@@ -115,10 +115,16 @@ func (s *SimpleSearcher) DeleteArticle(ctx context.Context, articleID string) er
 
 // articleToSearchHit 将文章转换为搜索结果
 func (s *SimpleSearcher) articleToSearchHit(article *model.Article) *model.SearchHit {
+	// 获取作者名称：优先使用文章的版权作者，其次使用站点所有者名称
+	author := article.CopyrightAuthor
+	if author == "" {
+		author = s.settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String())
+	}
+
 	hit := &model.SearchHit{
 		ID:          article.ID,
 		Title:       article.Title,
-		Author:      s.settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String()),
+		Author:      author,
 		CoverURL:    article.CoverURL,
 		Abbrlink:    article.Abbrlink,
 		PublishDate: article.CreatedAt,
