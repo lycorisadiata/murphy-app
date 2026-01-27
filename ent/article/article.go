@@ -60,6 +60,8 @@ const (
 	FieldAbbrlink = "abbrlink"
 	// FieldCopyright holds the string denoting the copyright field in the database.
 	FieldCopyright = "copyright"
+	// FieldIsReprint holds the string denoting the is_reprint field in the database.
+	FieldIsReprint = "is_reprint"
 	// FieldCopyrightAuthor holds the string denoting the copyright_author field in the database.
 	FieldCopyrightAuthor = "copyright_author"
 	// FieldCopyrightAuthorHref holds the string denoting the copyright_author_href field in the database.
@@ -96,6 +98,12 @@ const (
 	FieldDocSeriesID = "doc_series_id"
 	// FieldDocSort holds the string denoting the doc_sort field in the database.
 	FieldDocSort = "doc_sort"
+	// FieldShowRewardButton holds the string denoting the show_reward_button field in the database.
+	FieldShowRewardButton = "show_reward_button"
+	// FieldShowShareButton holds the string denoting the show_share_button field in the database.
+	FieldShowShareButton = "show_share_button"
+	// FieldShowSubscribeButton holds the string denoting the show_subscribe_button field in the database.
+	FieldShowSubscribeButton = "show_subscribe_button"
 	// EdgePostTags holds the string denoting the post_tags edge name in mutations.
 	EdgePostTags = "post_tags"
 	// EdgePostCategories holds the string denoting the post_categories edge name in mutations.
@@ -166,6 +174,7 @@ var Columns = []string{
 	FieldSummaries,
 	FieldAbbrlink,
 	FieldCopyright,
+	FieldIsReprint,
 	FieldCopyrightAuthor,
 	FieldCopyrightAuthorHref,
 	FieldCopyrightURL,
@@ -184,6 +193,9 @@ var Columns = []string{
 	FieldIsDoc,
 	FieldDocSeriesID,
 	FieldDocSort,
+	FieldShowRewardButton,
+	FieldShowShareButton,
+	FieldShowSubscribeButton,
 }
 
 var (
@@ -248,6 +260,8 @@ var (
 	PinSortValidator func(int) error
 	// DefaultCopyright holds the default value on creation for the "copyright" field.
 	DefaultCopyright bool
+	// DefaultIsReprint holds the default value on creation for the "is_reprint" field.
+	DefaultIsReprint bool
 	// DefaultIsTakedown holds the default value on creation for the "is_takedown" field.
 	DefaultIsTakedown bool
 	// DefaultExcludeFromMembership holds the default value on creation for the "exclude_from_membership" field.
@@ -258,6 +272,12 @@ var (
 	DefaultDocSort int
 	// DocSortValidator is a validator for the "doc_sort" field. It is called by the builders before save.
 	DocSortValidator func(int) error
+	// DefaultShowRewardButton holds the default value on creation for the "show_reward_button" field.
+	DefaultShowRewardButton bool
+	// DefaultShowShareButton holds the default value on creation for the "show_share_button" field.
+	DefaultShowShareButton bool
+	// DefaultShowSubscribeButton holds the default value on creation for the "show_subscribe_button" field.
+	DefaultShowSubscribeButton bool
 )
 
 // Status defines the type for the "status" enum field.
@@ -429,6 +449,11 @@ func ByCopyright(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCopyright, opts...).ToFunc()
 }
 
+// ByIsReprint orders the results by the is_reprint field.
+func ByIsReprint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsReprint, opts...).ToFunc()
+}
+
 // ByCopyrightAuthor orders the results by the copyright_author field.
 func ByCopyrightAuthor(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCopyrightAuthor, opts...).ToFunc()
@@ -512,6 +537,21 @@ func ByDocSeriesID(opts ...sql.OrderTermOption) OrderOption {
 // ByDocSort orders the results by the doc_sort field.
 func ByDocSort(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDocSort, opts...).ToFunc()
+}
+
+// ByShowRewardButton orders the results by the show_reward_button field.
+func ByShowRewardButton(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShowRewardButton, opts...).ToFunc()
+}
+
+// ByShowShareButton orders the results by the show_share_button field.
+func ByShowShareButton(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShowShareButton, opts...).ToFunc()
+}
+
+// ByShowSubscribeButton orders the results by the show_subscribe_button field.
+func ByShowSubscribeButton(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShowSubscribeButton, opts...).ToFunc()
 }
 
 // ByPostTagsCount orders the results by post_tags count.

@@ -2,7 +2,7 @@
  * @Description:
  * @Author: 安知鱼
  * @Date: 2025-10-17 10:35:28
- * @LastEditTime: 2025-11-13 13:36:28
+ * @LastEditTime: 2026-01-22 16:15:28
  * @LastEditors: 安知鱼
  */
 // anheyu-app/cmd/server/app.go
@@ -30,6 +30,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/internal/infra/storage"
 	"github.com/anzhiyu-c/anheyu-app/internal/pkg/event"
 	"github.com/anzhiyu-c/anheyu-app/internal/pkg/version"
+	"github.com/anzhiyu-c/anheyu-app/internal/service/cache"
 	"github.com/anzhiyu-c/anheyu-app/pkg/config"
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
 	"github.com/anzhiyu-c/anheyu-app/pkg/domain/model"
@@ -56,6 +57,7 @@ import (
 	search_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/search"
 	setting_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/setting"
 	sitemap_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/sitemap"
+	ssrtheme_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/ssrtheme"
 	statistics_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/statistics"
 	storage_policy_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/storage_policy"
 	subscriber_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/subscriber"
@@ -63,12 +65,14 @@ import (
 	thumbnail_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/thumbnail"
 	user_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/user"
 	version_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/version"
+	wechat_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/wechat"
 	"github.com/anzhiyu-c/anheyu-app/pkg/idgen"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/album"
 	album_category_service "github.com/anzhiyu-c/anheyu-app/pkg/service/album_category"
 	article_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article"
 	article_history_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article_history"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/auth"
+	captcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/captcha"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/cdn"
 	cleanup_service "github.com/anzhiyu-c/anheyu-app/pkg/service/cleanup"
 	comment_service "github.com/anzhiyu-c/anheyu-app/pkg/service/comment"
@@ -77,6 +81,8 @@ import (
 	doc_series_service "github.com/anzhiyu-c/anheyu-app/pkg/service/doc_series"
 	file_service "github.com/anzhiyu-c/anheyu-app/pkg/service/file"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/file_info"
+	geetest_service "github.com/anzhiyu-c/anheyu-app/pkg/service/geetest"
+	imagecaptcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/imagecaptcha"
 	link_service "github.com/anzhiyu-c/anheyu-app/pkg/service/link"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/music"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/notification"
@@ -93,13 +99,12 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/theme"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/thumbnail"
 	turnstile_service "github.com/anzhiyu-c/anheyu-app/pkg/service/turnstile"
-	geetest_service "github.com/anzhiyu-c/anheyu-app/pkg/service/geetest"
-	imagecaptcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/imagecaptcha"
-	captcha_service "github.com/anzhiyu-c/anheyu-app/pkg/service/captcha"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/user"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/utility"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/volume"
 	"github.com/anzhiyu-c/anheyu-app/pkg/service/volume/strategy"
+	wechat_service "github.com/anzhiyu-c/anheyu-app/pkg/service/wechat"
+	"github.com/anzhiyu-c/anheyu-app/pkg/ssr"
 
 	_ "github.com/anzhiyu-c/anheyu-app/ent/runtime"
 )
@@ -128,6 +133,10 @@ type App struct {
 	postCategorySvc      *post_category_service.Service
 	postTagSvc           *post_tag_service.Service
 	commentSvc           *comment_service.Service
+	themeSvc             theme.ThemeService
+	themeHandler         *theme_handler.Handler
+	ssrManager           *ssr.Manager
+	ssrThemeHandler      *ssrtheme_handler.Handler
 }
 
 func (a *App) PrintBanner() {
@@ -376,7 +385,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	log.Printf("[DEBUG] 正在初始化 PrimaryColorService...")
 	colorSvc := utility.NewColorService()
 	httpClient := &http.Client{Timeout: 10 * time.Second}
-	primaryColorSvc := utility.NewPrimaryColorService(colorSvc, settingSvc, fileRepo, storagePolicyRepo, httpClient, storageProviders)
+	primaryColorSvc := utility.NewPrimaryColorService(colorSvc, settingSvc, fileRepo, directLinkRepo, storagePolicyRepo, httpClient, storageProviders)
 	log.Printf("[DEBUG] PrimaryColorService 初始化完成")
 
 	// 初始化CDN服务
@@ -405,6 +414,11 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	log.Printf("[DEBUG] CommentService 初始化完成，PushooService 和 NotificationService 已注入")
 	themeSvc := theme.NewThemeService(entClient, userRepo)
 	_ = listener.NewFilePostProcessingListener(eventBus, taskBroker, extractionSvc)
+
+	// 初始化缓存清理服务（SSR 模式下启用）
+	revalidateSvc := cache.NewRevalidateService()
+	cacheRevalidateListener := listener.NewCacheRevalidateListener(revalidateSvc)
+	cacheRevalidateListener.RegisterHandlers(eventBus)
 
 	// 初始化音乐服务
 	log.Printf("[DEBUG] 正在初始化 MusicService...")
@@ -441,6 +455,57 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	captchaSvc := captcha_service.NewCaptchaService(settingSvc, turnstileSvc, geetestSvc, imageCaptchaSvc)
 	log.Printf("[DEBUG] CaptchaService 初始化完成")
 
+	// --- Phase 5.5: 初始化 SSR 主题管理器 ---
+	ssrManager := ssr.NewManager("./themes")
+	ssrThemeHandler := ssrtheme_handler.NewHandler(ssrManager, themeSvc)
+	log.Println("✅ SSR 主题管理器初始化成功")
+
+	// 同步 SSR 主题状态到数据库，并自动启动当前 SSR 主题
+	go func() {
+		ctx := context.Background()
+
+		// 先同步主题状态
+		if err := themeSvc.SyncSSRThemesFromFileSystem(ctx, 1, "./themes"); err != nil {
+			log.Printf("⚠️ SSR 主题同步失败: %v", err)
+			// 同步失败不影响启动流程，继续尝试启动已知的主题
+		}
+
+		// 自动启动当前激活的 SSR 主题
+		themeName, shouldStart := themeSvc.GetCurrentSSRThemeName(ctx, 1)
+		if !shouldStart || themeName == "" {
+			log.Println("📝 未检测到需要自动启动的 SSR 主题")
+			return
+		}
+
+		log.Printf("🚀 检测到当前 SSR 主题: %s，正在自动启动...", themeName)
+
+		// 使用默认端口 3000，带重试机制
+		const maxRetries = 3
+		const ssrPort = 3000
+
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			if err := ssrManager.Start(themeName, ssrPort); err != nil {
+				log.Printf("❌ 自动启动 SSR 主题失败 (尝试 %d/%d): %v", attempt, maxRetries, err)
+
+				// 如果是"已在运行"错误，不需要重试
+				if err.Error() == "theme already running" {
+					log.Printf("✅ SSR 主题 %s 已在运行", themeName)
+					return
+				}
+
+				if attempt < maxRetries {
+					log.Printf("⏳ 等待 3 秒后重试...")
+					time.Sleep(3 * time.Second)
+				}
+			} else {
+				log.Printf("✅ SSR 主题 %s 自动启动成功", themeName)
+				return
+			}
+		}
+
+		log.Printf("❌ SSR 主题 %s 自动启动失败，已达到最大重试次数", themeName)
+	}()
+
 	// --- Phase 6: 初始化表现层 (Handlers) ---
 	mw := middleware.NewMiddleware(tokenSvc)
 	authHandler := auth_handler.NewAuthHandler(authSvc, tokenSvc, settingSvc, captchaSvc)
@@ -463,7 +528,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	pageHandler := page_handler.NewHandler(pageSvc)
 	searchHandler := search_handler.NewHandler(searchSvc)
 	statisticsHandler := statistics_handler.NewStatisticsHandler(statService)
-	themeHandler := theme_handler.NewHandler(themeSvc)
+	themeHandler := theme_handler.NewHandler(themeSvc, ssrManager)
 	sitemapHandler := sitemap_handler.NewHandler(sitemapSvc)
 	proxyHandler := proxy_handler.NewHandler()
 	musicHandler := music_handler.NewMusicHandler(musicSvc)
@@ -497,6 +562,7 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		pageHandler,
 		statisticsHandler,
 		themeHandler,
+		ssrThemeHandler,
 		mw,
 		searchHandler,
 		proxyHandler,
@@ -526,8 +592,25 @@ func NewApp(content embed.FS) (*App, func(), error) {
 	}
 	engine.ForwardedByClientIP = true
 	engine.Use(middleware.Cors())
-	router.SetupFrontend(engine, settingSvc, articleSvc, cacheSvc, content, cfg)
+
+	// 设置 SSR 主题检查器（基于数据库状态判断是否应该代理）
+	// 这样即使 SSR 进程还在运行，切换到普通主题后也不会代理
+	middleware.SetSSRThemeChecker(func() (string, bool) {
+		// 使用固定的 userID=1（管理员）检查当前 SSR 主题状态
+		ctx := context.Background()
+		return themeSvc.GetCurrentSSRThemeName(ctx, 1)
+	})
+
+	// 注册 SSR 代理中间件（在路由之前）
+	// 当有 SSR 主题运行且数据库标记为当前主题时，前台请求会被代理到 SSR 主题
+	engine.Use(middleware.SSRProxyMiddleware(ssrManager))
+	log.Println("✅ SSR 代理中间件已注册（基于数据库状态判断）")
+
+	router.SetupFrontend(engine, settingSvc, articleSvc, cacheSvc, content, cfg, pageRepo)
 	appRouter.Setup(engine)
+
+	// --- 微信分享路由 ---
+	setupWechatShareRoutes(engine, settingSvc)
 
 	// 将所有初始化好的组件装配到 App 实例中
 	app := &App{
@@ -553,13 +636,22 @@ func NewApp(content embed.FS) (*App, func(), error) {
 		postCategorySvc:      postCategorySvc,
 		postTagSvc:           postTagSvc,
 		commentSvc:           commentSvc,
+		themeSvc:             themeSvc,
+		themeHandler:         themeHandler,
+		ssrManager:           ssrManager,
+		ssrThemeHandler:      ssrThemeHandler,
 	}
 
 	// 创建cleanup函数
 	cleanup := func() {
-		log.Println("执行清理操作：关闭数据库连接...")
+		log.Println("执行清理操作...")
+
+		// 停止所有 SSR 主题
+		log.Println("停止所有 SSR 主题...")
+		ssrManager.StopAll()
 
 		// 关闭数据库连接
+		log.Println("关闭数据库连接...")
 		sqlDB.Close()
 
 		// 关闭 Redis 连接（如果存在）
@@ -664,6 +756,26 @@ func (a *App) CommentService() *comment_service.Service {
 	return a.commentSvc
 }
 
+// ThemeService 返回主题服务（用于 PRO 版获取主题商城列表）
+func (a *App) ThemeService() theme.ThemeService {
+	return a.themeSvc
+}
+
+// SSRManager 返回 SSR 主题管理器（用于 PRO 版继承 SSR 功能）
+func (a *App) SSRManager() *ssr.Manager {
+	return a.ssrManager
+}
+
+// SSRThemeHandler 返回 SSR 主题处理器（用于 PRO 版继承 SSR 功能）
+func (a *App) SSRThemeHandler() *ssrtheme_handler.Handler {
+	return a.ssrThemeHandler
+}
+
+// ThemeHandler 返回主题处理器（用于 PRO 版配置为 PRO 模式）
+func (a *App) ThemeHandler() *theme_handler.Handler {
+	return a.themeHandler
+}
+
 func (a *App) Run() error {
 	a.taskBroker.RegisterCronJobs()
 	a.taskBroker.CheckAndRunMissedAggregation()
@@ -739,4 +851,33 @@ func getOrCreateIDSeed(ctx context.Context, settingRepo repository.SettingReposi
 	}
 
 	return newSeed, nil
+}
+
+// setupWechatShareRoutes 设置微信分享相关路由
+func setupWechatShareRoutes(engine *gin.Engine, settingSvc setting.SettingService) {
+	// 获取微信分享配置
+	wechatEnable := settingSvc.Get(constant.KeyWechatShareEnable.String())
+	wechatAppID := settingSvc.Get(constant.KeyWechatShareAppID.String())
+	wechatAppSecret := settingSvc.Get(constant.KeyWechatShareAppSecret.String())
+
+	// 如果未启用或配置不完整，跳过初始化
+	if wechatEnable != "true" || wechatAppID == "" || wechatAppSecret == "" {
+		log.Println("⚠️ 微信分享功能未启用或配置不完整，跳过初始化")
+		return
+	}
+
+	log.Println("🔧 初始化微信JS-SDK分享服务...")
+
+	// 创建微信分享服务
+	jssdkService := wechat_service.NewJSSDKService(wechatAppID, wechatAppSecret)
+	wechatShareHandler := wechat_handler.NewHandler(jssdkService)
+
+	// 注册路由
+	wechatGroup := engine.Group("/api/wechat/jssdk")
+	{
+		wechatGroup.GET("/config", wechatShareHandler.GetJSSDKConfig)    // 获取JS-SDK配置
+		wechatGroup.GET("/status", wechatShareHandler.CheckShareEnabled) // 检查分享功能状态
+	}
+
+	log.Println("✅ 微信JS-SDK分享服务已启动")
 }

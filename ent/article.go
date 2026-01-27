@@ -63,6 +63,8 @@ type Article struct {
 	Abbrlink *string `json:"abbrlink,omitempty"`
 	// 是否显示版权信息
 	Copyright bool `json:"copyright,omitempty"`
+	// 是否为转载文章
+	IsReprint bool `json:"is_reprint,omitempty"`
 	// 版权作者
 	CopyrightAuthor string `json:"copyright_author,omitempty"`
 	// 版权作者链接
@@ -99,6 +101,12 @@ type Article struct {
 	DocSeriesID *uint `json:"doc_series_id,omitempty"`
 	// 文档在系列中的排序，数值越小越靠前
 	DocSort int `json:"doc_sort,omitempty"`
+	// 是否显示打赏作者按钮
+	ShowRewardButton bool `json:"show_reward_button,omitempty"`
+	// 是否显示分享按钮
+	ShowShareButton bool `json:"show_share_button,omitempty"`
+	// 是否显示订阅按钮
+	ShowSubscribeButton bool `json:"show_subscribe_button,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ArticleQuery when eager-loading is set.
 	Edges        ArticleEdges `json:"edges"`
@@ -176,7 +184,7 @@ func (*Article) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case article.FieldSummaries, article.FieldExtraConfig:
 			values[i] = new([]byte)
-		case article.FieldIsPrimaryColorManual, article.FieldShowOnHome, article.FieldCopyright, article.FieldIsTakedown, article.FieldExcludeFromMembership, article.FieldIsDoc:
+		case article.FieldIsPrimaryColorManual, article.FieldShowOnHome, article.FieldCopyright, article.FieldIsReprint, article.FieldIsTakedown, article.FieldExcludeFromMembership, article.FieldIsDoc, article.FieldShowRewardButton, article.FieldShowShareButton, article.FieldShowSubscribeButton:
 			values[i] = new(sql.NullBool)
 		case article.FieldID, article.FieldOwnerID, article.FieldViewCount, article.FieldWordCount, article.FieldReadingTime, article.FieldHomeSort, article.FieldPinSort, article.FieldReviewedBy, article.FieldTakedownBy, article.FieldDocSeriesID, article.FieldDocSort:
 			values[i] = new(sql.NullInt64)
@@ -341,6 +349,12 @@ func (_m *Article) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Copyright = value.Bool
 			}
+		case article.FieldIsReprint:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_reprint", values[i])
+			} else if value.Valid {
+				_m.IsReprint = value.Bool
+			}
 		case article.FieldCopyrightAuthor:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field copyright_author", values[i])
@@ -456,6 +470,24 @@ func (_m *Article) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field doc_sort", values[i])
 			} else if value.Valid {
 				_m.DocSort = int(value.Int64)
+			}
+		case article.FieldShowRewardButton:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field show_reward_button", values[i])
+			} else if value.Valid {
+				_m.ShowRewardButton = value.Bool
+			}
+		case article.FieldShowShareButton:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field show_share_button", values[i])
+			} else if value.Valid {
+				_m.ShowShareButton = value.Bool
+			}
+		case article.FieldShowSubscribeButton:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field show_subscribe_button", values[i])
+			} else if value.Valid {
+				_m.ShowSubscribeButton = value.Bool
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -588,6 +620,9 @@ func (_m *Article) String() string {
 	builder.WriteString("copyright=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Copyright))
 	builder.WriteString(", ")
+	builder.WriteString("is_reprint=")
+	builder.WriteString(fmt.Sprintf("%v", _m.IsReprint))
+	builder.WriteString(", ")
 	builder.WriteString("copyright_author=")
 	builder.WriteString(_m.CopyrightAuthor)
 	builder.WriteString(", ")
@@ -653,6 +688,15 @@ func (_m *Article) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("doc_sort=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DocSort))
+	builder.WriteString(", ")
+	builder.WriteString("show_reward_button=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShowRewardButton))
+	builder.WriteString(", ")
+	builder.WriteString("show_share_button=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShowShareButton))
+	builder.WriteString(", ")
+	builder.WriteString("show_subscribe_button=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShowSubscribeButton))
 	builder.WriteByte(')')
 	return builder.String()
 }

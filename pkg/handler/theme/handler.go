@@ -28,6 +28,9 @@ import (
 // Handler 主题管理处理器
 type Handler struct {
 	themeService theme.ThemeService
+	ssrManager   theme.SSRManagerInterface // SSR 主题管理器
+	isProVersion bool                      // 是否为 PRO 版本
+	licenseKey   string                    // PRO 版授权密钥
 }
 
 // ThemeHandler 类型别名，简化引用
@@ -62,10 +65,21 @@ type (
 )
 
 // NewHandler 创建主题管理处理器实例
-func NewHandler(themeService theme.ThemeService) *Handler {
+func NewHandler(themeService theme.ThemeService, ssrManager theme.SSRManagerInterface) *Handler {
 	return &Handler{
 		themeService: themeService,
+		ssrManager:   ssrManager,
+		isProVersion: false,
+		licenseKey:   "",
 	}
+}
+
+// ConfigureForPro 配置为 PRO 版本模式
+// 调用此方法后，GetThemeMarket 会返回包含完整 downloadUrl 的 PRO 主题
+func (h *Handler) ConfigureForPro(licenseKey string) {
+	h.isProVersion = true
+	h.licenseKey = licenseKey
+	log.Printf("[Theme Handler] 已配置为 PRO 版本模式，授权密钥已设置")
 }
 
 // 辅助函数：统一的用户ID提取和验证
@@ -256,7 +270,7 @@ func (h *Handler) SwitchTheme(c *gin.Context) {
 		return
 	}
 
-	err = h.themeService.SwitchToTheme(c.Request.Context(), userID, req.ThemeName)
+	err = h.themeService.SwitchToTheme(c.Request.Context(), userID, req.ThemeName, h.ssrManager)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "切换主题失败: "+err.Error())
 		return
@@ -292,7 +306,7 @@ func (h *Handler) SwitchToOfficial(c *gin.Context) {
 		return
 	}
 
-	err = h.themeService.SwitchToOfficial(c.Request.Context(), userID)
+	err = h.themeService.SwitchToOfficial(c.Request.Context(), userID, h.ssrManager)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "切换到官方主题失败: "+err.Error())
 		return
@@ -358,14 +372,33 @@ type ThemeMarketListResponse struct {
 
 // GetThemeMarket 获取主题商城列表
 // @Summary      获取主题商城列表
-// @Description  获取主题商城中的所有可用主题
+// @Description  获取主题商城中的所有可用主题（PRO 版本会返回包含完整 downloadUrl 的 PRO 主题）
 // @Tags         主题商城
 // @Produce      json
 // @Success      200  {object}  response.Response{data=ThemeMarketListResponse}  "获取成功"
 // @Failure      500  {object}  response.Response  "获取失败"
 // @Router       /public/theme/market [get]
 func (h *Handler) GetThemeMarket(c *gin.Context) {
-	themes, err := h.themeService.GetThemeMarketList(c.Request.Context())
+	var themes []*theme.MarketTheme
+	var err error
+
+	// 根据版本类型选择不同的 API
+	log.Printf("[Theme Handler] 获取主题商城列表 - isProVersion: %v, hasLicenseKey: %v", h.isProVersion, h.licenseKey != "")
+	if h.isProVersion && h.licenseKey != "" {
+		// PRO 版本：调用 PRO API 获取包含完整 downloadUrl 的主题列表
+		log.Printf("[Theme Handler] 使用 PRO 模式调用主题商城 API")
+		themes, err = h.themeService.GetThemeMarketListForPro(c.Request.Context(), h.licenseKey)
+		if err != nil {
+			log.Printf("[Theme Handler] PRO API 调用失败，降级到公开 API: %v", err)
+			// 如果 PRO API 失败，降级到公开 API
+			themes, err = h.themeService.GetThemeMarketList(c.Request.Context())
+		}
+	} else {
+		// 社区版：调用公开 API
+		log.Printf("[Theme Handler] 使用社区版模式调用主题商城 API")
+		themes, err = h.themeService.GetThemeMarketList(c.Request.Context())
+	}
+
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "获取主题商城列表失败: "+err.Error())
 		return
@@ -554,4 +587,182 @@ func (h *Handler) FixThemeStatus(c *gin.Context) {
 
 	log.Printf("[Theme Handler] 用户 %d 的主题状态修复完成", userID)
 	response.Success(c, nil, "主题状态修复完成")
+}
+
+// ===== 主题配置相关 API =====
+
+// ThemeConfigRequest 保存主题配置请求
+type ThemeConfigRequest struct {
+	ThemeName string                 `json:"theme_name" binding:"required"`
+	Config    map[string]interface{} `json:"config" binding:"required"`
+}
+
+// GetThemeSettings 获取主题配置定义
+// @Summary      获取主题配置定义
+// @Description  获取指定主题的配置字段定义（用于后台生成配置表单）
+// @Tags         主题配置
+// @Security     BearerAuth
+// @Produce      json
+// @Param        theme_name  query     string  true  "主题名称"
+// @Success      200  {object}  response.Response{data=[]theme.ThemeSettingGroup}  "获取成功"
+// @Failure      400  {object}  response.Response  "参数错误"
+// @Failure      401  {object}  response.Response  "未授权"
+// @Failure      500  {object}  response.Response  "获取失败"
+// @Router       /theme/settings [get]
+func (h *Handler) GetThemeSettings(c *gin.Context) {
+	// 验证用户登录
+	_, err := h.extractUserID(c)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "用户未登录" {
+			status = http.StatusUnauthorized
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	themeName := c.Query("theme_name")
+	if themeName == "" {
+		response.Fail(c, http.StatusBadRequest, "主题名称不能为空")
+		return
+	}
+
+	settings, err := h.themeService.GetThemeSettings(c.Request.Context(), themeName)
+	if err != nil {
+		h.handleError(c, err, "获取主题配置定义失败", http.StatusInternalServerError)
+		return
+	}
+
+	response.Success(c, settings, "获取主题配置定义成功")
+}
+
+// GetUserThemeConfig 获取用户主题配置
+// @Summary      获取用户主题配置
+// @Description  获取用户对指定主题的配置值
+// @Tags         主题配置
+// @Security     BearerAuth
+// @Produce      json
+// @Param        theme_name  query     string  true  "主题名称"
+// @Success      200  {object}  response.Response{data=map[string]interface{}}  "获取成功"
+// @Failure      400  {object}  response.Response  "参数错误"
+// @Failure      401  {object}  response.Response  "未授权"
+// @Failure      500  {object}  response.Response  "获取失败"
+// @Router       /theme/config [get]
+func (h *Handler) GetUserThemeConfig(c *gin.Context) {
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "用户未登录" {
+			status = http.StatusUnauthorized
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	themeName := c.Query("theme_name")
+	if themeName == "" {
+		response.Fail(c, http.StatusBadRequest, "主题名称不能为空")
+		return
+	}
+
+	config, err := h.themeService.GetUserThemeConfig(c.Request.Context(), userID, themeName)
+	if err != nil {
+		h.handleError(c, err, "获取用户主题配置失败", http.StatusInternalServerError)
+		return
+	}
+
+	response.Success(c, config, "获取用户主题配置成功")
+}
+
+// SaveUserThemeConfig 保存用户主题配置
+// @Summary      保存用户主题配置
+// @Description  保存用户对指定主题的配置值
+// @Tags         主题配置
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body  ThemeConfigRequest  true  "主题配置请求"
+// @Success      200  {object}  response.Response  "保存成功"
+// @Failure      400  {object}  response.Response  "参数错误"
+// @Failure      401  {object}  response.Response  "未授权"
+// @Failure      500  {object}  response.Response  "保存失败"
+// @Router       /theme/config [post]
+func (h *Handler) SaveUserThemeConfig(c *gin.Context) {
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "用户未登录" {
+			status = http.StatusUnauthorized
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	var req ThemeConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, "请求参数格式错误: "+err.Error())
+		return
+	}
+
+	err = h.themeService.SaveUserThemeConfig(c.Request.Context(), userID, req.ThemeName, req.Config)
+	if err != nil {
+		h.handleError(c, err, "保存主题配置失败", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[Theme Handler] 用户 %d 保存了主题 %s 的配置", userID, req.ThemeName)
+	response.Success(c, nil, "主题配置保存成功")
+}
+
+// GetCurrentThemeConfig 获取当前主题配置（公开接口）
+// @Summary      获取当前主题配置
+// @Description  获取当前激活主题的配置定义和值（供前端主题使用的公开接口）
+// @Tags         主题配置
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  response.Response{data=theme.ThemeConfigResponse}  "获取成功"
+// @Failure      400  {object}  response.Response  "参数错误"
+// @Failure      500  {object}  response.Response  "获取失败"
+// @Router       /theme/current-config [get]
+func (h *Handler) GetCurrentThemeConfig(c *gin.Context) {
+	userID, err := h.extractUserID(c)
+	if err != nil {
+		status := http.StatusBadRequest
+		if err.Error() == "用户未登录" {
+			status = http.StatusUnauthorized
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+
+	config, err := h.themeService.GetCurrentThemeConfig(c.Request.Context(), userID)
+	if err != nil {
+		h.handleError(c, err, "获取当前主题配置失败", http.StatusInternalServerError)
+		return
+	}
+
+	response.Success(c, config, "获取当前主题配置成功")
+}
+
+// GetPublicThemeConfig 获取当前主题配置（无需登录的公开接口）
+// @Summary      获取当前主题配置（公开）
+// @Description  获取当前激活主题的配置值（供前端主题使用，只返回配置值）
+// @Tags         主题配置
+// @Produce      json
+// @Success      200  {object}  response.Response{data=map[string]interface{}}  "获取成功"
+// @Failure      500  {object}  response.Response  "获取失败"
+// @Router       /public/theme/config [get]
+func (h *Handler) GetPublicThemeConfig(c *gin.Context) {
+	// 公开接口，使用默认用户（通常是系统管理员）的配置
+	// 在单用户博客场景下，获取第一个管理员的配置
+	config, err := h.themeService.GetCurrentThemeConfig(c.Request.Context(), 1)
+	if err != nil {
+		// 出错时返回空配置而不是错误
+		log.Printf("[Theme Handler] 获取公开主题配置失败: %v", err)
+		response.Success(c, map[string]interface{}{}, "获取主题配置成功")
+		return
+	}
+
+	// 只返回配置值，不返回定义
+	response.Success(c, config.Values, "获取主题配置成功")
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/anzhiyu-c/anheyu-app/ent"
@@ -520,7 +521,28 @@ func (h *Handler) GetPrimaryColor(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "无效的请求参数")
 		return
 	}
-	log.Printf("[Handler.GetPrimaryColor] 图片URL: %s", req.ImageURL)
+
+	// 处理相对路径：如果是以 / 开头的相对路径，补全为完整URL
+	imageURL := req.ImageURL
+	if strings.HasPrefix(imageURL, "/") {
+		// 从请求中获取协议和主机
+		scheme := "https"
+		if c.Request.TLS == nil {
+			// 检查是否通过反向代理传递了协议信息
+			if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+				scheme = proto
+			} else if c.Request.URL.Scheme != "" {
+				scheme = c.Request.URL.Scheme
+			}
+		}
+		host := c.Request.Host
+		if forwardedHost := c.GetHeader("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		}
+		imageURL = scheme + "://" + host + imageURL
+		log.Printf("[Handler.GetPrimaryColor] 将相对路径转换为完整URL: %s -> %s", req.ImageURL, imageURL)
+	}
+	log.Printf("[Handler.GetPrimaryColor] 图片URL: %s", imageURL)
 
 	// 2. 验证用户登录状态
 	_, err := getClaims(c)
@@ -532,7 +554,7 @@ func (h *Handler) GetPrimaryColor(c *gin.Context) {
 
 	// 3. 调用Service层获取主色调
 	log.Printf("[Handler.GetPrimaryColor] 开始调用Service层获取主色调...")
-	primaryColor, err := h.svc.GetPrimaryColorFromURL(c.Request.Context(), req.ImageURL)
+	primaryColor, err := h.svc.GetPrimaryColorFromURL(c.Request.Context(), imageURL)
 	if err != nil {
 		log.Printf("[Handler.GetPrimaryColor] 获取主色调失败: %v", err)
 		response.Fail(c, http.StatusInternalServerError, "获取主色调失败: "+err.Error())

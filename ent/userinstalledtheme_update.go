@@ -171,6 +171,20 @@ func (_u *UserInstalledThemeUpdate) ClearInstalledVersion() *UserInstalledThemeU
 	return _u
 }
 
+// SetDeployType sets the "deploy_type" field.
+func (_u *UserInstalledThemeUpdate) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeUpdate {
+	_u.mutation.SetDeployType(v)
+	return _u
+}
+
+// SetNillableDeployType sets the "deploy_type" field if the given value is not nil.
+func (_u *UserInstalledThemeUpdate) SetNillableDeployType(v *userinstalledtheme.DeployType) *UserInstalledThemeUpdate {
+	if v != nil {
+		_u.SetDeployType(*v)
+	}
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UserInstalledThemeUpdate) SetUser(v *User) *UserInstalledThemeUpdate {
 	return _u.SetUserID(v.ID)
@@ -241,6 +255,11 @@ func (_u *UserInstalledThemeUpdate) check() error {
 			return &ValidationError{Name: "installed_version", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.installed_version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DeployType(); ok {
+		if err := userinstalledtheme.DeployTypeValidator(v); err != nil {
+			return &ValidationError{Name: "deploy_type", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.deploy_type": %w`, err)}
+		}
+	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "UserInstalledTheme.user"`)
 	}
@@ -303,6 +322,9 @@ func (_u *UserInstalledThemeUpdate) sqlSave(ctx context.Context) (_node int, err
 	}
 	if _u.mutation.InstalledVersionCleared() {
 		_spec.ClearField(userinstalledtheme.FieldInstalledVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.DeployType(); ok {
+		_spec.SetField(userinstalledtheme.FieldDeployType, field.TypeEnum, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -496,6 +518,20 @@ func (_u *UserInstalledThemeUpdateOne) ClearInstalledVersion() *UserInstalledThe
 	return _u
 }
 
+// SetDeployType sets the "deploy_type" field.
+func (_u *UserInstalledThemeUpdateOne) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeUpdateOne {
+	_u.mutation.SetDeployType(v)
+	return _u
+}
+
+// SetNillableDeployType sets the "deploy_type" field if the given value is not nil.
+func (_u *UserInstalledThemeUpdateOne) SetNillableDeployType(v *userinstalledtheme.DeployType) *UserInstalledThemeUpdateOne {
+	if v != nil {
+		_u.SetDeployType(*v)
+	}
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UserInstalledThemeUpdateOne) SetUser(v *User) *UserInstalledThemeUpdateOne {
 	return _u.SetUserID(v.ID)
@@ -579,6 +615,11 @@ func (_u *UserInstalledThemeUpdateOne) check() error {
 			return &ValidationError{Name: "installed_version", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.installed_version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DeployType(); ok {
+		if err := userinstalledtheme.DeployTypeValidator(v); err != nil {
+			return &ValidationError{Name: "deploy_type", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.deploy_type": %w`, err)}
+		}
+	}
 	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "UserInstalledTheme.user"`)
 	}
@@ -658,6 +699,9 @@ func (_u *UserInstalledThemeUpdateOne) sqlSave(ctx context.Context) (_node *User
 	}
 	if _u.mutation.InstalledVersionCleared() {
 		_spec.ClearField(userinstalledtheme.FieldInstalledVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.DeployType(); ok {
+		_spec.SetField(userinstalledtheme.FieldDeployType, field.TypeEnum, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

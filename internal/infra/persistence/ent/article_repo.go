@@ -95,6 +95,7 @@ func (r *articleRepo) toModel(a *ent.Article) *model.Article {
 		Summaries:            a.Summaries,
 		Abbrlink:             abbrlinkStr,
 		Copyright:            a.Copyright,
+		IsReprint:            a.IsReprint,
 		CopyrightAuthor:      a.CopyrightAuthor,
 		CopyrightAuthorHref:  a.CopyrightAuthorHref,
 		CopyrightURL:         a.CopyrightURL,
@@ -520,6 +521,7 @@ func (r *articleRepo) Create(ctx context.Context, params *model.CreateArticlePar
 		SetTopImgURL(topImgURL).
 		SetSummaries(params.Summaries).
 		SetCopyright(params.Copyright).
+		SetIsReprint(params.IsReprint).
 		SetCopyrightAuthor(params.CopyrightAuthor).
 		SetCopyrightAuthorHref(params.CopyrightAuthorHref).
 		SetCopyrightURL(params.CopyrightURL).
@@ -668,6 +670,9 @@ func (r *articleRepo) Update(ctx context.Context, publicID string, req *model.Up
 	}
 	if req.Copyright != nil {
 		updater.SetCopyright(*req.Copyright)
+	}
+	if req.IsReprint != nil {
+		updater.SetIsReprint(*req.IsReprint)
 	}
 	if req.CopyrightAuthor != nil {
 		updater.SetCopyrightAuthor(*req.CopyrightAuthor)
@@ -839,16 +844,23 @@ func (r *articleRepo) ListPublic(ctx context.Context, options *model.ListPublicA
 		q = q.Offset((options.Page - 1) * options.PageSize).Limit(options.PageSize)
 	}
 
-	entities, err := q.Select(
-		article.FieldID, article.FieldCreatedAt, article.FieldUpdatedAt,
-		article.FieldTitle, article.FieldCoverURL, article.FieldStatus,
-		article.FieldViewCount, article.FieldWordCount, article.FieldReadingTime,
-		article.FieldIPLocation, article.FieldPrimaryColor, article.FieldIsPrimaryColorManual,
-		article.FieldShowOnHome, article.FieldHomeSort, article.FieldPinSort, article.FieldTopImgURL,
-		article.FieldSummaries, article.FieldAbbrlink, article.FieldCopyright,
-		article.FieldCopyrightAuthor, article.FieldCopyrightAuthorHref, article.FieldCopyrightURL,
-		article.FieldIsDoc, article.FieldDocSeriesID, // 文档模式相关字段
-	).All(ctx)
+	var entities []*ent.Article
+	if options.WithContent {
+		// 包含内容字段，用于知识库同步等场景
+		entities, err = q.All(ctx)
+	} else {
+		// 默认只选择列表展示需要的字段
+		entities, err = q.Select(
+			article.FieldID, article.FieldCreatedAt, article.FieldUpdatedAt,
+			article.FieldTitle, article.FieldCoverURL, article.FieldStatus,
+			article.FieldViewCount, article.FieldWordCount, article.FieldReadingTime,
+			article.FieldIPLocation, article.FieldPrimaryColor, article.FieldIsPrimaryColorManual,
+			article.FieldShowOnHome, article.FieldHomeSort, article.FieldPinSort, article.FieldTopImgURL,
+			article.FieldSummaries, article.FieldAbbrlink, article.FieldCopyright,
+			article.FieldCopyrightAuthor, article.FieldCopyrightAuthorHref, article.FieldCopyrightURL,
+			article.FieldIsDoc, article.FieldDocSeriesID, // 文档模式相关字段
+		).All(ctx)
+	}
 
 	if err != nil {
 		return nil, 0, err

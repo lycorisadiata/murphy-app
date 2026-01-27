@@ -2722,6 +2722,7 @@ type ArticleMutation struct {
 	appendsummaries         []string
 	abbrlink                *string
 	copyright               *bool
+	is_reprint              *bool
 	copyright_author        *string
 	copyright_author_href   *string
 	copyright_url           *string
@@ -2742,6 +2743,9 @@ type ArticleMutation struct {
 	is_doc                  *bool
 	doc_sort                *int
 	adddoc_sort             *int
+	show_reward_button      *bool
+	show_share_button       *bool
+	show_subscribe_button   *bool
 	clearedFields           map[string]struct{}
 	post_tags               map[uint]struct{}
 	removedpost_tags        map[uint]struct{}
@@ -3911,6 +3915,42 @@ func (m *ArticleMutation) ResetCopyright() {
 	m.copyright = nil
 }
 
+// SetIsReprint sets the "is_reprint" field.
+func (m *ArticleMutation) SetIsReprint(b bool) {
+	m.is_reprint = &b
+}
+
+// IsReprint returns the value of the "is_reprint" field in the mutation.
+func (m *ArticleMutation) IsReprint() (r bool, exists bool) {
+	v := m.is_reprint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsReprint returns the old "is_reprint" field's value of the Article entity.
+// If the Article object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleMutation) OldIsReprint(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsReprint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsReprint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsReprint: %w", err)
+	}
+	return oldValue.IsReprint, nil
+}
+
+// ResetIsReprint resets all changes to the "is_reprint" field.
+func (m *ArticleMutation) ResetIsReprint() {
+	m.is_reprint = nil
+}
+
 // SetCopyrightAuthor sets the "copyright_author" field.
 func (m *ArticleMutation) SetCopyrightAuthor(s string) {
 	m.copyright_author = &s
@@ -4790,6 +4830,114 @@ func (m *ArticleMutation) ResetDocSort() {
 	m.adddoc_sort = nil
 }
 
+// SetShowRewardButton sets the "show_reward_button" field.
+func (m *ArticleMutation) SetShowRewardButton(b bool) {
+	m.show_reward_button = &b
+}
+
+// ShowRewardButton returns the value of the "show_reward_button" field in the mutation.
+func (m *ArticleMutation) ShowRewardButton() (r bool, exists bool) {
+	v := m.show_reward_button
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShowRewardButton returns the old "show_reward_button" field's value of the Article entity.
+// If the Article object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleMutation) OldShowRewardButton(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShowRewardButton is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShowRewardButton requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShowRewardButton: %w", err)
+	}
+	return oldValue.ShowRewardButton, nil
+}
+
+// ResetShowRewardButton resets all changes to the "show_reward_button" field.
+func (m *ArticleMutation) ResetShowRewardButton() {
+	m.show_reward_button = nil
+}
+
+// SetShowShareButton sets the "show_share_button" field.
+func (m *ArticleMutation) SetShowShareButton(b bool) {
+	m.show_share_button = &b
+}
+
+// ShowShareButton returns the value of the "show_share_button" field in the mutation.
+func (m *ArticleMutation) ShowShareButton() (r bool, exists bool) {
+	v := m.show_share_button
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShowShareButton returns the old "show_share_button" field's value of the Article entity.
+// If the Article object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleMutation) OldShowShareButton(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShowShareButton is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShowShareButton requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShowShareButton: %w", err)
+	}
+	return oldValue.ShowShareButton, nil
+}
+
+// ResetShowShareButton resets all changes to the "show_share_button" field.
+func (m *ArticleMutation) ResetShowShareButton() {
+	m.show_share_button = nil
+}
+
+// SetShowSubscribeButton sets the "show_subscribe_button" field.
+func (m *ArticleMutation) SetShowSubscribeButton(b bool) {
+	m.show_subscribe_button = &b
+}
+
+// ShowSubscribeButton returns the value of the "show_subscribe_button" field in the mutation.
+func (m *ArticleMutation) ShowSubscribeButton() (r bool, exists bool) {
+	v := m.show_subscribe_button
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShowSubscribeButton returns the old "show_subscribe_button" field's value of the Article entity.
+// If the Article object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ArticleMutation) OldShowSubscribeButton(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShowSubscribeButton is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShowSubscribeButton requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShowSubscribeButton: %w", err)
+	}
+	return oldValue.ShowSubscribeButton, nil
+}
+
+// ResetShowSubscribeButton resets all changes to the "show_subscribe_button" field.
+func (m *ArticleMutation) ResetShowSubscribeButton() {
+	m.show_subscribe_button = nil
+}
+
 // AddPostTagIDs adds the "post_tags" edge to the PostTag entity by ids.
 func (m *ArticleMutation) AddPostTagIDs(ids ...uint) {
 	if m.post_tags == nil {
@@ -5067,7 +5215,7 @@ func (m *ArticleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ArticleMutation) Fields() []string {
-	fields := make([]string, 0, 40)
+	fields := make([]string, 0, 44)
 	if m.deleted_at != nil {
 		fields = append(fields, article.FieldDeletedAt)
 	}
@@ -5134,6 +5282,9 @@ func (m *ArticleMutation) Fields() []string {
 	if m.copyright != nil {
 		fields = append(fields, article.FieldCopyright)
 	}
+	if m.is_reprint != nil {
+		fields = append(fields, article.FieldIsReprint)
+	}
 	if m.copyright_author != nil {
 		fields = append(fields, article.FieldCopyrightAuthor)
 	}
@@ -5188,6 +5339,15 @@ func (m *ArticleMutation) Fields() []string {
 	if m.doc_sort != nil {
 		fields = append(fields, article.FieldDocSort)
 	}
+	if m.show_reward_button != nil {
+		fields = append(fields, article.FieldShowRewardButton)
+	}
+	if m.show_share_button != nil {
+		fields = append(fields, article.FieldShowShareButton)
+	}
+	if m.show_subscribe_button != nil {
+		fields = append(fields, article.FieldShowSubscribeButton)
+	}
 	return fields
 }
 
@@ -5240,6 +5400,8 @@ func (m *ArticleMutation) Field(name string) (ent.Value, bool) {
 		return m.Abbrlink()
 	case article.FieldCopyright:
 		return m.Copyright()
+	case article.FieldIsReprint:
+		return m.IsReprint()
 	case article.FieldCopyrightAuthor:
 		return m.CopyrightAuthor()
 	case article.FieldCopyrightAuthorHref:
@@ -5276,6 +5438,12 @@ func (m *ArticleMutation) Field(name string) (ent.Value, bool) {
 		return m.DocSeriesID()
 	case article.FieldDocSort:
 		return m.DocSort()
+	case article.FieldShowRewardButton:
+		return m.ShowRewardButton()
+	case article.FieldShowShareButton:
+		return m.ShowShareButton()
+	case article.FieldShowSubscribeButton:
+		return m.ShowSubscribeButton()
 	}
 	return nil, false
 }
@@ -5329,6 +5497,8 @@ func (m *ArticleMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldAbbrlink(ctx)
 	case article.FieldCopyright:
 		return m.OldCopyright(ctx)
+	case article.FieldIsReprint:
+		return m.OldIsReprint(ctx)
 	case article.FieldCopyrightAuthor:
 		return m.OldCopyrightAuthor(ctx)
 	case article.FieldCopyrightAuthorHref:
@@ -5365,6 +5535,12 @@ func (m *ArticleMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldDocSeriesID(ctx)
 	case article.FieldDocSort:
 		return m.OldDocSort(ctx)
+	case article.FieldShowRewardButton:
+		return m.OldShowRewardButton(ctx)
+	case article.FieldShowShareButton:
+		return m.OldShowShareButton(ctx)
+	case article.FieldShowSubscribeButton:
+		return m.OldShowSubscribeButton(ctx)
 	}
 	return nil, fmt.Errorf("unknown Article field %s", name)
 }
@@ -5528,6 +5704,13 @@ func (m *ArticleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCopyright(v)
 		return nil
+	case article.FieldIsReprint:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsReprint(v)
+		return nil
 	case article.FieldCopyrightAuthor:
 		v, ok := value.(string)
 		if !ok {
@@ -5653,6 +5836,27 @@ func (m *ArticleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDocSort(v)
+		return nil
+	case article.FieldShowRewardButton:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShowRewardButton(v)
+		return nil
+	case article.FieldShowShareButton:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShowShareButton(v)
+		return nil
+	case article.FieldShowSubscribeButton:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShowSubscribeButton(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Article field %s", name)
@@ -6015,6 +6219,9 @@ func (m *ArticleMutation) ResetField(name string) error {
 	case article.FieldCopyright:
 		m.ResetCopyright()
 		return nil
+	case article.FieldIsReprint:
+		m.ResetIsReprint()
+		return nil
 	case article.FieldCopyrightAuthor:
 		m.ResetCopyrightAuthor()
 		return nil
@@ -6068,6 +6275,15 @@ func (m *ArticleMutation) ResetField(name string) error {
 		return nil
 	case article.FieldDocSort:
 		m.ResetDocSort()
+		return nil
+	case article.FieldShowRewardButton:
+		m.ResetShowRewardButton()
+		return nil
+	case article.FieldShowShareButton:
+		m.ResetShowShareButton()
+		return nil
+	case article.FieldShowSubscribeButton:
+		m.ResetShowSubscribeButton()
 		return nil
 	}
 	return fmt.Errorf("unknown Article field %s", name)
@@ -28170,6 +28386,7 @@ type UserInstalledThemeMutation struct {
 	install_time       *time.Time
 	user_theme_config  *map[string]interface{}
 	installed_version  *string
+	deploy_type        *userinstalledtheme.DeployType
 	clearedFields      map[string]struct{}
 	user               *uint
 	cleareduser        bool
@@ -28715,6 +28932,42 @@ func (m *UserInstalledThemeMutation) ResetInstalledVersion() {
 	delete(m.clearedFields, userinstalledtheme.FieldInstalledVersion)
 }
 
+// SetDeployType sets the "deploy_type" field.
+func (m *UserInstalledThemeMutation) SetDeployType(ut userinstalledtheme.DeployType) {
+	m.deploy_type = &ut
+}
+
+// DeployType returns the value of the "deploy_type" field in the mutation.
+func (m *UserInstalledThemeMutation) DeployType() (r userinstalledtheme.DeployType, exists bool) {
+	v := m.deploy_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeployType returns the old "deploy_type" field's value of the UserInstalledTheme entity.
+// If the UserInstalledTheme object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserInstalledThemeMutation) OldDeployType(ctx context.Context) (v userinstalledtheme.DeployType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeployType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeployType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeployType: %w", err)
+	}
+	return oldValue.DeployType, nil
+}
+
+// ResetDeployType resets all changes to the "deploy_type" field.
+func (m *UserInstalledThemeMutation) ResetDeployType() {
+	m.deploy_type = nil
+}
+
 // ClearUser clears the "user" edge to the User entity.
 func (m *UserInstalledThemeMutation) ClearUser() {
 	m.cleareduser = true
@@ -28776,7 +29029,7 @@ func (m *UserInstalledThemeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserInstalledThemeMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.deleted_at != nil {
 		fields = append(fields, userinstalledtheme.FieldDeletedAt)
 	}
@@ -28807,6 +29060,9 @@ func (m *UserInstalledThemeMutation) Fields() []string {
 	if m.installed_version != nil {
 		fields = append(fields, userinstalledtheme.FieldInstalledVersion)
 	}
+	if m.deploy_type != nil {
+		fields = append(fields, userinstalledtheme.FieldDeployType)
+	}
 	return fields
 }
 
@@ -28835,6 +29091,8 @@ func (m *UserInstalledThemeMutation) Field(name string) (ent.Value, bool) {
 		return m.UserThemeConfig()
 	case userinstalledtheme.FieldInstalledVersion:
 		return m.InstalledVersion()
+	case userinstalledtheme.FieldDeployType:
+		return m.DeployType()
 	}
 	return nil, false
 }
@@ -28864,6 +29122,8 @@ func (m *UserInstalledThemeMutation) OldField(ctx context.Context, name string) 
 		return m.OldUserThemeConfig(ctx)
 	case userinstalledtheme.FieldInstalledVersion:
 		return m.OldInstalledVersion(ctx)
+	case userinstalledtheme.FieldDeployType:
+		return m.OldDeployType(ctx)
 	}
 	return nil, fmt.Errorf("unknown UserInstalledTheme field %s", name)
 }
@@ -28942,6 +29202,13 @@ func (m *UserInstalledThemeMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetInstalledVersion(v)
+		return nil
+	case userinstalledtheme.FieldDeployType:
+		v, ok := value.(userinstalledtheme.DeployType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeployType(v)
 		return nil
 	}
 	return fmt.Errorf("unknown UserInstalledTheme field %s", name)
@@ -29063,6 +29330,9 @@ func (m *UserInstalledThemeMutation) ResetField(name string) error {
 		return nil
 	case userinstalledtheme.FieldInstalledVersion:
 		m.ResetInstalledVersion()
+		return nil
+	case userinstalledtheme.FieldDeployType:
+		m.ResetDeployType()
 		return nil
 	}
 	return fmt.Errorf("unknown UserInstalledTheme field %s", name)

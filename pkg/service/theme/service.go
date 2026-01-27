@@ -2,7 +2,7 @@
  * @Description: 主题管理服务（优化版）
  * @Author: 安知鱼
  * @Date: 2025-09-18 11:00:00
- * @LastEditTime: 2025-09-19 11:16:05
+ * @LastEditTime: 2026-01-24 17:52:13
  * @LastEditors: 安知鱼
  *
  * 设计原则：
@@ -45,7 +45,26 @@ const (
 
 	// 外部主题商城API地址
 	ThemeMarketAPI = "https://anheyuofficialwebsiteapi.anheyu.com/api/v1/themes"
+
+	// 部署类型常量
+	DeployTypeStandard = "standard" // 普通主题
+	DeployTypeSSR      = "ssr"      // SSR 主题
 )
+
+// SSRManagerInterface SSR 主题管理器接口
+// 用于解耦 ThemeService 和 SSR Manager
+type SSRManagerInterface interface {
+	// Start 启动 SSR 主题
+	Start(themeName string, port int) error
+	// Stop 停止 SSR 主题
+	Stop(themeName string) error
+	// IsRunning 检查主题是否正在运行
+	IsRunning(themeName string) bool
+	// ListRunning 列出所有正在运行的主题
+	ListRunning() []string
+	// StopAll 停止所有运行中的主题
+	StopAll() error
+}
 
 // ThemeInfo 主题信息结构（与主题商城格式保持一致，并添加本地状态）
 type ThemeInfo struct {
@@ -92,6 +111,7 @@ type MarketTheme struct {
 	Author         string   `json:"author"`
 	Description    string   `json:"description"`
 	ThemeType      string   `json:"themeType"`
+	DeployType     string   `json:"deployType"` // standard-传统安装，ssr-Docker SSR 部署
 	RepoURL        string   `json:"repoUrl"`
 	InstructionURL string   `json:"instructionUrl"`
 	Price          int      `json:"price"`
@@ -126,6 +146,52 @@ type ThemeMetadata struct {
 	Screenshots interface{}       `json:"screenshots"` // 支持字符串或字符串数组
 	Engines     map[string]string `json:"engines"`
 	Features    []string          `json:"features"`
+	// 主题配置定义（类似 Halo 的 settings.yaml）
+	Settings []ThemeSettingGroup `json:"settings,omitempty"`
+}
+
+// ThemeSettingGroup 主题配置分组
+type ThemeSettingGroup struct {
+	Group  string              `json:"group"`  // 分组标识（如 style, layout, footer）
+	Label  string              `json:"label"`  // 分组显示名称
+	Fields []ThemeSettingField `json:"fields"` // 配置字段列表
+}
+
+// ThemeSettingField 主题配置字段定义
+type ThemeSettingField struct {
+	Name        string                `json:"name"`                  // 字段名称（唯一标识）
+	Label       string                `json:"label"`                 // 显示标签
+	Type        string                `json:"type"`                  // 字段类型: text, textarea, number, select, color, switch, image, code
+	Default     interface{}           `json:"default,omitempty"`     // 默认值
+	Placeholder string                `json:"placeholder,omitempty"` // 占位提示
+	Description string                `json:"description,omitempty"` // 字段描述
+	Required    bool                  `json:"required,omitempty"`    // 是否必填
+	Options     []ThemeSettingOption  `json:"options,omitempty"`     // 选项（用于 select、radio 类型）
+	Validation  *ThemeFieldValidation `json:"validation,omitempty"`  // 验证规则
+	Condition   *ThemeFieldCondition  `json:"condition,omitempty"`   // 显示条件（依赖其他字段）
+}
+
+// ThemeSettingOption 配置字段选项
+type ThemeSettingOption struct {
+	Label string      `json:"label"` // 选项显示名称
+	Value interface{} `json:"value"` // 选项值
+}
+
+// ThemeFieldValidation 字段验证规则
+type ThemeFieldValidation struct {
+	MinLength *int     `json:"minLength,omitempty"` // 最小长度
+	MaxLength *int     `json:"maxLength,omitempty"` // 最大长度
+	Min       *float64 `json:"min,omitempty"`       // 最小值（数字类型）
+	Max       *float64 `json:"max,omitempty"`       // 最大值（数字类型）
+	Pattern   string   `json:"pattern,omitempty"`   // 正则表达式
+	Message   string   `json:"message,omitempty"`   // 验证失败提示
+}
+
+// ThemeFieldCondition 字段显示条件
+type ThemeFieldCondition struct {
+	Field    string      `json:"field"`    // 依赖的字段名
+	Operator string      `json:"operator"` // 操作符: eq, neq, contains, gt, lt
+	Value    interface{} `json:"value"`    // 比较值
 }
 
 // AuthorInfo 作者信息结构
@@ -157,11 +223,12 @@ type ThemeService interface {
 	// 安装主题（简化流程）
 	InstallTheme(ctx context.Context, userID uint, req *ThemeInstallRequest) error
 
-	// 切换到指定主题
-	SwitchToTheme(ctx context.Context, userID uint, themeName string) error
+	// 切换到指定主题（可能是普通主题或官方主题）
+	// ssrManager: 用于切换到普通/官方主题时停止 SSR 进程
+	SwitchToTheme(ctx context.Context, userID uint, themeName string, ssrManager SSRManagerInterface) error
 
-	// 切换到官方主题
-	SwitchToOfficial(ctx context.Context, userID uint) error
+	// 切换到官方主题（需要停止所有 SSR 主题）
+	SwitchToOfficial(ctx context.Context, userID uint, ssrManager SSRManagerInterface) error
 
 	// 卸载主题
 	UninstallTheme(ctx context.Context, userID uint, themeName string) error
@@ -172,6 +239,9 @@ type ThemeService interface {
 	// 获取主题商城列表（从外部API获取）
 	GetThemeMarketList(ctx context.Context) ([]*MarketTheme, error)
 
+	// 获取 PRO 版本主题商城列表（包含完整的 PRO 主题下载链接）
+	GetThemeMarketListForPro(ctx context.Context, licenseKey string) ([]*MarketTheme, error)
+
 	// 上传主题压缩包
 	UploadTheme(ctx context.Context, userID uint, file *multipart.FileHeader, forceUpdate ...bool) (*ThemeInfo, error)
 
@@ -180,6 +250,51 @@ type ThemeService interface {
 
 	// 修复用户主题的当前状态数据一致性
 	FixThemeCurrentStatus(ctx context.Context, userID uint) error
+
+	// ===== SSR 主题管理 =====
+
+	// 安装 SSR 主题（写入数据库记录）
+	InstallSSRTheme(ctx context.Context, userID uint, themeName string, version string, marketID int) error
+
+	// 卸载 SSR 主题（删除数据库记录）
+	UninstallSSRTheme(ctx context.Context, userID uint, themeName string) error
+
+	// 切换到 SSR 主题（更新 is_current，停止其他 SSR）
+	SwitchToSSRTheme(ctx context.Context, userID uint, themeName string, ssrManager SSRManagerInterface) error
+
+	// 清除所有主题的当前状态
+	ClearAllThemeCurrentStatus(ctx context.Context, userID uint) error
+
+	// 同步 SSR 主题状态（扫描文件系统，同步到数据库）
+	SyncSSRThemesFromFileSystem(ctx context.Context, userID uint, themesDir string) error
+
+	// 获取 SSR 主题的 is_current 状态（返回 map[themeName]isCurrent）
+	GetSSRThemeCurrentStatus(ctx context.Context, userID uint) (map[string]bool, error)
+
+	// 获取当前活跃的 SSR 主题名称（供代理中间件使用）
+	// 返回 (themeName, isCurrent)：如果有 SSR 主题设置为当前主题，返回其名称和 true
+	GetCurrentSSRThemeName(ctx context.Context, userID uint) (string, bool)
+
+	// ===== 主题配置相关 =====
+
+	// 获取主题的配置定义（从 theme.json 读取）
+	GetThemeSettings(ctx context.Context, themeName string) ([]ThemeSettingGroup, error)
+
+	// 获取用户对某主题的配置值
+	GetUserThemeConfig(ctx context.Context, userID uint, themeName string) (map[string]interface{}, error)
+
+	// 保存用户对某主题的配置值
+	SaveUserThemeConfig(ctx context.Context, userID uint, themeName string, config map[string]interface{}) error
+
+	// 获取当前激活主题的配置（供前端主题使用的公开接口）
+	GetCurrentThemeConfig(ctx context.Context, userID uint) (*ThemeConfigResponse, error)
+}
+
+// ThemeConfigResponse 主题配置响应
+type ThemeConfigResponse struct {
+	ThemeName string                 `json:"theme_name"` // 主题名称
+	Settings  []ThemeSettingGroup    `json:"settings"`   // 配置定义
+	Values    map[string]interface{} `json:"values"`     // 当前配置值（用户配置 + 默认值）
 }
 
 // themeService 主题服务实现
@@ -249,8 +364,8 @@ func (s *themeService) GetThemeMarketList(ctx context.Context) ([]*MarketTheme, 
 		return []*MarketTheme{}, nil
 	}
 
-	// 检查API响应码
-	if apiResp.Code != 200 {
+	// 检查API响应码（官网 API 成功时返回 code: 0）
+	if apiResp.Code != 0 && apiResp.Code != 200 {
 		log.Printf("API返回错误码: %d, 消息: %s，返回空列表", apiResp.Code, apiResp.Message)
 		return []*MarketTheme{}, nil
 	}
@@ -262,6 +377,103 @@ func (s *themeService) GetThemeMarketList(ctx context.Context) ([]*MarketTheme, 
 
 	log.Printf("成功从主题商城API获取到 %d 个主题", len(apiResp.Data.List))
 	return apiResp.Data.List, nil
+}
+
+// PRO 版本主题商城 API 地址
+const ThemeMarketProAPI = "https://anheyuofficialwebsiteapi.anheyu.com/api/v1/themes/pro"
+
+// GetThemeMarketListForPro 获取 PRO 版本主题商城列表（包含完整的 PRO 主题下载链接）
+// licenseKey 参数用于授权密钥验证
+func (s *themeService) GetThemeMarketListForPro(ctx context.Context, licenseKey string) ([]*MarketTheme, error) {
+	// 创建HTTP客户端请求
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", ThemeMarketProAPI, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Anheyu-Pro/1.0")
+	req.Header.Set("X-License-Key", licenseKey) // 传递授权密钥用于验证
+
+	log.Printf("[PRO API] 正在调用 PRO 主题商城 API: %s", ThemeMarketProAPI)
+
+	// 发送请求
+	resp, err := client.Do(req)
+	if err != nil {
+		// 如果 PRO API 调用失败，回退到普通 API
+		log.Printf("调用 PRO 主题商城API失败: %v，回退到普通API", err)
+		return s.GetThemeMarketList(ctx)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		// 授权密钥无效，回退到普通 API
+		log.Printf("PRO 主题商城API授权密钥无效，回退到普通API")
+		return s.GetThemeMarketList(ctx)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("PRO 主题商城API返回错误状态码: %d，回退到普通API", resp.StatusCode)
+		return s.GetThemeMarketList(ctx)
+	}
+
+	// 读取响应体
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("读取 PRO API响应失败: %v，回退到普通API", err)
+		return s.GetThemeMarketList(ctx)
+	}
+
+	// PRO API 返回格式可能有两种：
+	// 1. 直接返回 {"list":[...],"total":2}
+	// 2. 包装格式 {"code":0,"data":{"list":[...],"total":2}}
+
+	// 先尝试解析直接格式
+	type DirectResponse struct {
+		List  []*MarketTheme `json:"list"`
+		Total int            `json:"total"`
+	}
+
+	var directResp DirectResponse
+	if err := json.Unmarshal(body, &directResp); err == nil && directResp.List != nil {
+		log.Printf("成功从 PRO 主题商城API获取到 %d 个主题（直接格式，包含完整下载链接）", len(directResp.List))
+		return directResp.List, nil
+	}
+
+	// 尝试解析包装格式
+	type WrappedResponse struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			List  []*MarketTheme `json:"list"`
+			Total int            `json:"total"`
+		} `json:"data"`
+	}
+
+	var wrappedResp WrappedResponse
+	if err := json.Unmarshal(body, &wrappedResp); err != nil {
+		log.Printf("解析 PRO API响应失败: %v，回退到普通API", err)
+		return s.GetThemeMarketList(ctx)
+	}
+
+	// 检查API响应码（官网 API 成功时返回 code: 0）
+	if wrappedResp.Code != 0 && wrappedResp.Code != 200 {
+		log.Printf("PRO API返回错误码: %d, 消息: %s，回退到普通API", wrappedResp.Code, wrappedResp.Message)
+		return s.GetThemeMarketList(ctx)
+	}
+
+	// 返回主题列表
+	if wrappedResp.Data.List == nil {
+		return []*MarketTheme{}, nil
+	}
+
+	log.Printf("成功从 PRO 主题商城API获取到 %d 个主题（包装格式，包含完整下载链接）", len(wrappedResp.Data.List))
+	return wrappedResp.Data.List, nil
 }
 
 // GetCurrentTheme 获取当前使用的主题
@@ -356,6 +568,30 @@ func (s *themeService) GetCurrentTheme(ctx context.Context, userID uint) (*Theme
 	return themeInfo, nil
 }
 
+// GetCurrentSSRThemeName 获取当前活跃的 SSR 主题名称
+// 返回 (themeName, isCurrent)
+// - themeName: SSR 主题名称
+// - isCurrent: 是否有 SSR 主题设置为当前主题
+// 此方法供 SSR 代理中间件使用，用于判断是否应该代理请求到 SSR
+func (s *themeService) GetCurrentSSRThemeName(ctx context.Context, userID uint) (string, bool) {
+	// 直接查询数据库中 is_current=true 且 deploy_type=ssr 的主题
+	theme, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.IsCurrent(true),
+			userinstalledtheme.DeployTypeEQ(userinstalledtheme.DeployTypeSsr),
+		).
+		First(ctx)
+
+	if err != nil {
+		// 没有找到当前 SSR 主题（可能是官方主题或普通主题）
+		return "", false
+	}
+
+	return theme.ThemeName, true
+}
+
 // GetInstalledThemes 获取用户已安装的主题列表
 func (s *themeService) GetInstalledThemes(ctx context.Context, userID uint) ([]*ThemeInfo, error) {
 	// 首先自动修复数据状态不一致问题
@@ -364,10 +600,13 @@ func (s *themeService) GetInstalledThemes(ctx context.Context, userID uint) ([]*
 		// 继续执行，不因修复失败而中断获取主题列表
 	}
 
-	// 从数据库获取已安装主题
+	// 从数据库获取已安装主题（排除 SSR 类型，SSR 主题由单独的 API 返回）
 	localThemes, err := s.db.UserInstalledTheme.
 		Query().
-		Where(userinstalledtheme.UserID(userID)).
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.DeployTypeNEQ(userinstalledtheme.DeployTypeSsr),
+		).
 		Order(ent.Desc(userinstalledtheme.FieldInstallTime)).
 		All(ctx)
 
@@ -487,9 +726,24 @@ func (s *themeService) GetInstalledThemes(ctx context.Context, userID uint) ([]*
 	// 检查静态模式状态
 	staticModeActive := s.IsStaticModeActive()
 
-	// 根据静态模式状态调整主题的当前使用状态
-	if !staticModeActive {
-		// 如果没有static目录，官方主题为当前使用，所有数据库主题都不应该是当前使用
+	// 检查数据库中是否有任何主题（包括 SSR 主题）被设为当前使用
+	// 这用于判断官方主题是否应该显示为当前
+	hasCurrentThemeInDB, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.IsCurrent(true),
+		).
+		Exist(ctx)
+	if err != nil {
+		log.Printf("查询数据库当前主题失败: %v", err)
+		hasCurrentThemeInDB = false
+	}
+
+	// 根据静态模式状态和数据库当前主题状态调整主题的当前使用状态
+	// 只有在没有 static 目录且数据库中没有任何当前主题时，官方主题才应该是当前使用
+	if !staticModeActive && !hasCurrentThemeInDB {
+		// 如果没有static目录且数据库中没有当前主题，则所有数据库主题都不应该是当前使用
 		for _, theme := range result {
 			if theme.IsCurrent {
 				log.Printf("警告：用户 %d 在官方主题模式下，数据库主题 %s 仍标记为当前使用，将被修正", userID, theme.Name)
@@ -509,8 +763,9 @@ func (s *themeService) GetInstalledThemes(ctx context.Context, userID uint) ([]*
 
 	if !hasOfficial {
 		now := time.Now()
-		// 核心逻辑：如果没有static目录，官方主题就是当前使用的
-		isOfficialCurrent := !staticModeActive
+		// 核心逻辑：只有在没有 static 目录且数据库中没有任何当前主题时，官方主题才是当前使用的
+		// 如果数据库中有其他主题（包括 SSR 主题）被设为当前，官方主题就不是当前
+		isOfficialCurrent := !staticModeActive && !hasCurrentThemeInDB
 
 		officialTheme := &ThemeInfo{
 			ID:             1,
@@ -692,11 +947,11 @@ func (s *themeService) isOfficialTheme(themeName string) bool {
 }
 
 // SwitchToTheme 切换到指定主题
-func (s *themeService) SwitchToTheme(ctx context.Context, userID uint, themeName string) error {
+func (s *themeService) SwitchToTheme(ctx context.Context, userID uint, themeName string, ssrManager SSRManagerInterface) error {
 	// 检查是否是官方主题
 	if s.isOfficialTheme(themeName) {
 		log.Printf("用户 %d 请求切换到官方主题: %s", userID, themeName)
-		return s.SwitchToOfficial(ctx, userID)
+		return s.SwitchToOfficial(ctx, userID, ssrManager)
 	}
 
 	// 1. 检查主题是否已安装
@@ -806,25 +1061,11 @@ func (s *themeService) SwitchToTheme(ctx context.Context, userID uint, themeName
 }
 
 // SwitchToOfficial 切换到官方主题
-func (s *themeService) SwitchToOfficial(ctx context.Context, userID uint) error {
-	// 1. 备份当前static目录（如果存在）
-	backupPath := ""
-	if s.IsStaticModeActive() {
-		backupPath = filepath.Join(BackupDirName, fmt.Sprintf("static_backup_%d", time.Now().Unix()))
-		if err := s.backupDirectory(StaticDirName, backupPath); err != nil {
-			return fmt.Errorf("备份静态文件失败: %w", err)
-		}
-	}
-
-	// 2. 安全删除static目录
-	if err := s.safeRemoveStaticDir(); err != nil {
-		if backupPath != "" {
-			s.restoreFromBackup(backupPath, StaticDirName)
-		}
-		return fmt.Errorf("删除静态目录失败: %w", err)
-	}
-
-	// 3. 更新数据库记录
+// 重要：先更新数据库状态，再停止 SSR 进程
+// 这样即使停止进程失败，代理中间件也不会再代理请求（因为数据库状态已经更新了）
+func (s *themeService) SwitchToOfficial(ctx context.Context, userID uint, ssrManager SSRManagerInterface) error {
+	// 1. 首先更新数据库记录（让代理中间件立即停止代理到 SSR）
+	// 这是最关键的一步，必须首先执行
 	_, err := s.db.UserInstalledTheme.
 		Update().
 		Where(userinstalledtheme.UserID(userID)).
@@ -832,13 +1073,40 @@ func (s *themeService) SwitchToOfficial(ctx context.Context, userID uint) error 
 		Save(ctx)
 
 	if err != nil {
-		if backupPath != "" {
-			s.restoreFromBackup(backupPath, StaticDirName)
-		}
 		return fmt.Errorf("更新主题状态失败: %w", err)
 	}
+	log.Printf("[切换到官方主题] 数据库状态已更新：所有主题 is_current=false")
 
-	// 4. 验证切换后的状态一致性
+	// 2. 备份当前static目录（如果存在）
+	backupPath := ""
+	if s.IsStaticModeActive() {
+		backupPath = filepath.Join(BackupDirName, fmt.Sprintf("static_backup_%d", time.Now().Unix()))
+		if err := s.backupDirectory(StaticDirName, backupPath); err != nil {
+			log.Printf("[切换到官方主题] 警告：备份静态文件失败: %v", err)
+			// 不阻塞，继续执行
+		}
+	}
+
+	// 3. 安全删除static目录
+	if err := s.safeRemoveStaticDir(); err != nil {
+		log.Printf("[切换到官方主题] 警告：删除静态目录失败: %v", err)
+		// 不阻塞，继续执行
+	}
+
+	// 4. 停止所有运行中的 SSR 主题（异步执行，不阻塞主流程）
+	// 即使这一步失败，前面数据库状态已经更新，代理中间件也不会再代理到 SSR
+	if ssrManager != nil {
+		runningThemes := ssrManager.ListRunning()
+		for _, themeName := range runningThemes {
+			log.Printf("[切换到官方主题] 停止 SSR 主题: %s", themeName)
+			if err := ssrManager.Stop(themeName); err != nil {
+				log.Printf("[切换到官方主题] 停止 SSR 主题 %s 失败（不影响切换结果）: %v", themeName, err)
+				// 继续处理，不阻塞切换
+			}
+		}
+	}
+
+	// 5. 验证切换后的状态一致性
 	currentThemesCount, err := s.db.UserInstalledTheme.
 		Query().
 		Where(
@@ -853,7 +1121,7 @@ func (s *themeService) SwitchToOfficial(ctx context.Context, userID uint) error 
 		log.Printf("警告：用户 %d 切换到官方主题后仍有 %d 个数据库主题标记为当前，状态异常", userID, currentThemesCount)
 	}
 
-	// 5. 清理备份文件
+	// 6. 清理备份文件
 	if backupPath != "" {
 		os.RemoveAll(backupPath)
 	}
@@ -1853,8 +2121,23 @@ func (s *themeService) forceCleanStaticDir() error {
 func (s *themeService) FixThemeCurrentStatus(ctx context.Context, userID uint) error {
 	staticModeActive := s.IsStaticModeActive()
 
-	if !staticModeActive {
-		// 没有static目录时，所有数据库主题都不应该是当前使用
+	// 首先检查是否有 SSR 主题被设为当前
+	// 如果有 SSR 主题是当前使用，则不应该重置它
+	hasCurrentSSRTheme, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.IsCurrent(true),
+			userinstalledtheme.DeployTypeEQ(userinstalledtheme.DeployTypeSsr),
+		).
+		Exist(ctx)
+	if err != nil {
+		log.Printf("检查当前 SSR 主题状态失败: %v", err)
+		hasCurrentSSRTheme = false
+	}
+
+	if !staticModeActive && !hasCurrentSSRTheme {
+		// 没有static目录且没有SSR主题被设为当前时，所有数据库主题都不应该是当前使用
 		updatedCount, err := s.db.UserInstalledTheme.
 			Update().
 			Where(
@@ -1871,7 +2154,7 @@ func (s *themeService) FixThemeCurrentStatus(ctx context.Context, userID uint) e
 		if updatedCount > 0 {
 			log.Printf("已修复用户 %d 的 %d 个主题状态（从当前使用改为非当前使用）", userID, updatedCount)
 		}
-	} else {
+	} else if staticModeActive {
 		// 有static目录时，确保只有一个主题是当前使用
 		currentThemes, err := s.db.UserInstalledTheme.
 			Query().
@@ -1905,4 +2188,616 @@ func (s *themeService) FixThemeCurrentStatus(ctx context.Context, userID uint) e
 	}
 
 	return nil
+}
+
+// ===== 主题配置相关方法实现 =====
+
+// GetThemeSettings 获取主题的配置定义
+func (s *themeService) GetThemeSettings(ctx context.Context, themeName string) ([]ThemeSettingGroup, error) {
+	// 官方主题没有自定义配置
+	if s.isOfficialTheme(themeName) {
+		return []ThemeSettingGroup{}, nil
+	}
+
+	// 从磁盘读取 theme.json
+	metadata, err := s.loadThemeMetadataFromDisk(themeName)
+	if err != nil {
+		return nil, fmt.Errorf("读取主题元数据失败: %w", err)
+	}
+
+	// 返回配置定义
+	if metadata.Settings == nil {
+		return []ThemeSettingGroup{}, nil
+	}
+
+	return metadata.Settings, nil
+}
+
+// GetUserThemeConfig 获取用户对某主题的配置值
+func (s *themeService) GetUserThemeConfig(ctx context.Context, userID uint, themeName string) (map[string]interface{}, error) {
+	// 查询用户安装的主题
+	installedTheme, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.ThemeName(themeName),
+		).
+		First(ctx)
+
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, fmt.Errorf("主题 %s 未安装", themeName)
+		}
+		return nil, fmt.Errorf("查询主题失败: %w", err)
+	}
+
+	// 返回用户配置
+	if installedTheme.UserThemeConfig == nil {
+		return map[string]interface{}{}, nil
+	}
+
+	return installedTheme.UserThemeConfig, nil
+}
+
+// SaveUserThemeConfig 保存用户对某主题的配置值
+func (s *themeService) SaveUserThemeConfig(ctx context.Context, userID uint, themeName string, config map[string]interface{}) error {
+	// 获取配置定义用于验证
+	settings, err := s.GetThemeSettings(ctx, themeName)
+	if err != nil {
+		return fmt.Errorf("获取主题配置定义失败: %w", err)
+	}
+
+	// 验证配置值
+	if err := s.validateThemeConfig(settings, config); err != nil {
+		return fmt.Errorf("配置验证失败: %w", err)
+	}
+
+	// 更新数据库
+	_, err = s.db.UserInstalledTheme.
+		Update().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.ThemeName(themeName),
+		).
+		SetUserThemeConfig(config).
+		Save(ctx)
+
+	if err != nil {
+		return fmt.Errorf("保存主题配置失败: %w", err)
+	}
+
+	log.Printf("用户 %d 的主题 %s 配置已保存", userID, themeName)
+	return nil
+}
+
+// GetCurrentThemeConfig 获取当前激活主题的配置（供前端主题使用）
+func (s *themeService) GetCurrentThemeConfig(ctx context.Context, userID uint) (*ThemeConfigResponse, error) {
+	// 获取当前主题
+	currentTheme, err := s.GetCurrentTheme(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("获取当前主题失败: %w", err)
+	}
+
+	// 官方主题返回空配置
+	if currentTheme.IsOfficial || s.isOfficialTheme(currentTheme.Name) {
+		return &ThemeConfigResponse{
+			ThemeName: currentTheme.Name,
+			Settings:  []ThemeSettingGroup{},
+			Values:    map[string]interface{}{},
+		}, nil
+	}
+
+	// 获取配置定义
+	settings, err := s.GetThemeSettings(ctx, currentTheme.Name)
+	if err != nil {
+		log.Printf("获取主题 %s 的配置定义失败: %v", currentTheme.Name, err)
+		settings = []ThemeSettingGroup{}
+	}
+
+	// 获取用户配置
+	userConfig, err := s.GetUserThemeConfig(ctx, userID, currentTheme.Name)
+	if err != nil {
+		log.Printf("获取用户主题配置失败: %v", err)
+		userConfig = map[string]interface{}{}
+	}
+
+	// 合并默认值和用户配置
+	mergedValues := s.mergeConfigWithDefaults(settings, userConfig)
+
+	return &ThemeConfigResponse{
+		ThemeName: currentTheme.Name,
+		Settings:  settings,
+		Values:    mergedValues,
+	}, nil
+}
+
+// validateThemeConfig 验证主题配置值
+func (s *themeService) validateThemeConfig(settings []ThemeSettingGroup, config map[string]interface{}) error {
+	// 构建字段定义映射
+	fieldDefs := make(map[string]ThemeSettingField)
+	for _, group := range settings {
+		for _, field := range group.Fields {
+			fieldDefs[field.Name] = field
+		}
+	}
+
+	// 验证每个配置项
+	for key, value := range config {
+		fieldDef, exists := fieldDefs[key]
+		if !exists {
+			// 允许额外的配置项（向前兼容）
+			log.Printf("警告：未知的配置项 %s", key)
+			continue
+		}
+
+		// 验证必填字段
+		if fieldDef.Required && (value == nil || value == "") {
+			return fmt.Errorf("字段 %s 为必填项", fieldDef.Label)
+		}
+
+		// 验证字段类型
+		if err := s.validateFieldValue(fieldDef, value); err != nil {
+			return fmt.Errorf("字段 %s 验证失败: %w", fieldDef.Label, err)
+		}
+	}
+
+	// 检查必填字段是否都有值
+	for _, group := range settings {
+		for _, field := range group.Fields {
+			if field.Required {
+				if _, exists := config[field.Name]; !exists {
+					return fmt.Errorf("字段 %s 为必填项", field.Label)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateFieldValue 验证单个字段值
+func (s *themeService) validateFieldValue(field ThemeSettingField, value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
+	validation := field.Validation
+	if validation == nil {
+		return nil
+	}
+
+	// 字符串类型验证
+	if strVal, ok := value.(string); ok {
+		if validation.MinLength != nil && len(strVal) < *validation.MinLength {
+			return fmt.Errorf("长度不能小于 %d", *validation.MinLength)
+		}
+		if validation.MaxLength != nil && len(strVal) > *validation.MaxLength {
+			return fmt.Errorf("长度不能大于 %d", *validation.MaxLength)
+		}
+		if validation.Pattern != "" {
+			matched, err := regexp.MatchString(validation.Pattern, strVal)
+			if err != nil {
+				return fmt.Errorf("正则表达式无效")
+			}
+			if !matched {
+				if validation.Message != "" {
+					return fmt.Errorf("%s", validation.Message)
+				}
+				return fmt.Errorf("格式不正确")
+			}
+		}
+	}
+
+	// 数字类型验证
+	if numVal, ok := value.(float64); ok {
+		if validation.Min != nil && numVal < *validation.Min {
+			return fmt.Errorf("值不能小于 %v", *validation.Min)
+		}
+		if validation.Max != nil && numVal > *validation.Max {
+			return fmt.Errorf("值不能大于 %v", *validation.Max)
+		}
+	}
+
+	return nil
+}
+
+// mergeConfigWithDefaults 合并用户配置和默认值
+func (s *themeService) mergeConfigWithDefaults(settings []ThemeSettingGroup, userConfig map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// 首先设置所有默认值
+	for _, group := range settings {
+		for _, field := range group.Fields {
+			if field.Default != nil {
+				result[field.Name] = field.Default
+			}
+		}
+	}
+
+	// 然后用用户配置覆盖
+	for key, value := range userConfig {
+		result[key] = value
+	}
+
+	return result
+}
+
+// ===== SSR 主题管理方法实现 =====
+
+// InstallSSRTheme 安装 SSR 主题（写入数据库记录）
+func (s *themeService) InstallSSRTheme(ctx context.Context, userID uint, themeName string, version string, marketID int) error {
+	// 检查是否已安装
+	exists, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.ThemeName(themeName),
+		).
+		Exist(ctx)
+
+	if err != nil {
+		return fmt.Errorf("检查 SSR 主题是否存在失败: %w", err)
+	}
+
+	if exists {
+		// 已存在，更新版本信息
+		_, err = s.db.UserInstalledTheme.
+			Update().
+			Where(
+				userinstalledtheme.UserID(userID),
+				userinstalledtheme.ThemeName(themeName),
+			).
+			SetInstalledVersion(version).
+			SetInstallTime(time.Now()).
+			Save(ctx)
+
+		if err != nil {
+			return fmt.Errorf("更新 SSR 主题记录失败: %w", err)
+		}
+
+		log.Printf("[SSR主题] 更新主题记录: %s, 版本: %s", themeName, version)
+		return nil
+	}
+
+	// 创建新记录
+	createBuilder := s.db.UserInstalledTheme.
+		Create().
+		SetUserID(userID).
+		SetThemeName(themeName).
+		SetDeployType(userinstalledtheme.DeployTypeSsr).
+		SetInstallTime(time.Now()).
+		SetIsCurrent(false)
+
+	if version != "" {
+		createBuilder = createBuilder.SetInstalledVersion(version)
+	}
+
+	if marketID > 0 {
+		createBuilder = createBuilder.SetThemeMarketID(marketID)
+	}
+
+	_, err = createBuilder.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("创建 SSR 主题记录失败: %w", err)
+	}
+
+	log.Printf("[SSR主题] 安装主题成功: %s, 版本: %s", themeName, version)
+	return nil
+}
+
+// UninstallSSRTheme 卸载 SSR 主题（删除数据库记录）
+func (s *themeService) UninstallSSRTheme(ctx context.Context, userID uint, themeName string) error {
+	// 检查是否为当前主题
+	theme, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.ThemeName(themeName),
+		).
+		First(ctx)
+
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// 数据库中没有记录，直接返回成功
+			log.Printf("[SSR主题] 主题 %s 在数据库中不存在，跳过删除", themeName)
+			return nil
+		}
+		return fmt.Errorf("查询 SSR 主题失败: %w", err)
+	}
+
+	if theme.IsCurrent {
+		return fmt.Errorf("不能卸载当前使用的主题，请先切换到其他主题")
+	}
+
+	// 删除记录
+	if err := s.db.UserInstalledTheme.DeleteOneID(theme.ID).Exec(ctx); err != nil {
+		return fmt.Errorf("删除 SSR 主题记录失败: %w", err)
+	}
+
+	log.Printf("[SSR主题] 卸载主题成功: %s", themeName)
+	return nil
+}
+
+// SwitchToSSRTheme 切换到 SSR 主题
+func (s *themeService) SwitchToSSRTheme(ctx context.Context, userID uint, themeName string, ssrManager SSRManagerInterface) error {
+	// #region agent log
+	debugLog := func(msg string, data map[string]interface{}) {
+		f, _ := os.OpenFile("/Users/anzhiyu/Project/2025/anheyu-work/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if f != nil {
+			defer f.Close()
+			entry := map[string]interface{}{"location": "service.go:SwitchToSSRTheme", "message": msg, "data": data, "timestamp": time.Now().UnixMilli(), "sessionId": "debug-session", "hypothesisId": "A"}
+			jsonData, _ := json.Marshal(entry)
+			f.Write(append(jsonData, '\n'))
+		}
+	}
+	// #endregion
+	// #region agent log
+	debugLog("开始切换SSR主题", map[string]interface{}{"userID": userID, "themeName": themeName})
+	// #endregion
+
+	// 1. 检查目标主题是否已安装
+	theme, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.ThemeName(themeName),
+		).
+		First(ctx)
+
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// #region agent log
+			debugLog("主题未安装", map[string]interface{}{"error": "not found"})
+			// #endregion
+			return fmt.Errorf("SSR 主题 %s 未安装", themeName)
+		}
+		return fmt.Errorf("查询 SSR 主题失败: %w", err)
+	}
+
+	// #region agent log
+	debugLog("找到目标主题", map[string]interface{}{"themeID": theme.ID, "currentIsCurrent": theme.IsCurrent})
+	// #endregion
+
+	// 2. 停止其他运行中的 SSR 主题
+	if ssrManager != nil {
+		runningThemes := ssrManager.ListRunning()
+		// #region agent log
+		debugLog("运行中的SSR主题", map[string]interface{}{"runningThemes": runningThemes})
+		// #endregion
+		for _, name := range runningThemes {
+			if name != themeName {
+				if err := ssrManager.Stop(name); err != nil {
+					log.Printf("[SSR主题] 停止主题 %s 失败: %v", name, err)
+				}
+			}
+		}
+	}
+
+	// 3. 使用事务更新数据库状态
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("开启事务失败: %w", err)
+	}
+
+	// 清除所有主题的当前状态
+	clearedCount, err := tx.UserInstalledTheme.
+		Update().
+		Where(userinstalledtheme.UserID(userID)).
+		SetIsCurrent(false).
+		Save(ctx)
+
+	// #region agent log
+	debugLog("清除所有主题is_current状态", map[string]interface{}{"clearedCount": clearedCount, "error": fmt.Sprintf("%v", err)})
+	// #endregion
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("清除主题当前状态失败: %w", err)
+	}
+
+	// 设置目标主题为当前主题
+	updatedTheme, err := tx.UserInstalledTheme.
+		UpdateOneID(theme.ID).
+		SetIsCurrent(true).
+		Save(ctx)
+
+	// #region agent log
+	if updatedTheme != nil {
+		debugLog("设置目标主题为当前", map[string]interface{}{"themeID": updatedTheme.ID, "newIsCurrent": updatedTheme.IsCurrent, "error": fmt.Sprintf("%v", err)})
+	} else {
+		debugLog("设置目标主题为当前", map[string]interface{}{"updatedTheme": "nil", "error": fmt.Sprintf("%v", err)})
+	}
+	// #endregion
+
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("设置当前主题失败: %w", err)
+	}
+
+	// 4. 启动 SSR 主题
+	if ssrManager != nil {
+		// 如果主题未运行，启动它
+		if !ssrManager.IsRunning(themeName) {
+			// #region agent log
+			debugLog("启动SSR主题", map[string]interface{}{"themeName": themeName})
+			// #endregion
+			if err := ssrManager.Start(themeName, 3000); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("启动 SSR 主题失败: %w", err)
+			}
+		}
+	}
+
+	// 5. 提交事务
+	if err := tx.Commit(); err != nil {
+		// #region agent log
+		debugLog("事务提交失败", map[string]interface{}{"error": err.Error()})
+		// #endregion
+		// 如果提交失败，尝试停止刚启动的主题
+		if ssrManager != nil {
+			ssrManager.Stop(themeName)
+		}
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+
+	// #region agent log
+	debugLog("切换SSR主题完成", map[string]interface{}{"themeName": themeName, "success": true})
+	// #endregion
+
+	log.Printf("[SSR主题] 切换到主题成功: %s", themeName)
+	return nil
+}
+
+// ClearAllThemeCurrentStatus 清除所有主题的当前状态
+func (s *themeService) ClearAllThemeCurrentStatus(ctx context.Context, userID uint) error {
+	updatedCount, err := s.db.UserInstalledTheme.
+		Update().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.IsCurrent(true),
+		).
+		SetIsCurrent(false).
+		Save(ctx)
+
+	if err != nil {
+		return fmt.Errorf("清除主题当前状态失败: %w", err)
+	}
+
+	if updatedCount > 0 {
+		log.Printf("[主题切换] 已清除用户 %d 的 %d 个主题的当前状态", userID, updatedCount)
+	}
+
+	return nil
+}
+
+// SyncSSRThemesFromFileSystem 同步 SSR 主题状态
+// 扫描文件系统中的 SSR 主题，确保数据库中有对应记录
+func (s *themeService) SyncSSRThemesFromFileSystem(ctx context.Context, userID uint, themesDir string) error {
+	// 读取主题目录
+	entries, err := os.ReadDir(themesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("[主题同步] 主题目录不存在: %s", themesDir)
+			return nil
+		}
+		return fmt.Errorf("读取主题目录失败: %w", err)
+	}
+
+	var synced int
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		themeName := entry.Name()
+		themePath := filepath.Join(themesDir, themeName)
+
+		// 检查是否是 SSR 主题（有 server.js 文件）
+		serverJS := filepath.Join(themePath, "server.js")
+		if _, err := os.Stat(serverJS); os.IsNotExist(err) {
+			continue
+		}
+
+		// 检查数据库中是否已有记录
+		exists, err := s.db.UserInstalledTheme.
+			Query().
+			Where(
+				userinstalledtheme.UserID(userID),
+				userinstalledtheme.ThemeName(themeName),
+			).
+			Exist(ctx)
+
+		if err != nil {
+			log.Printf("[主题同步] 检查主题 %s 失败: %v", themeName, err)
+			continue
+		}
+
+		if exists {
+			// 已存在，确保 deploy_type 正确
+			_, err = s.db.UserInstalledTheme.
+				Update().
+				Where(
+					userinstalledtheme.UserID(userID),
+					userinstalledtheme.ThemeName(themeName),
+				).
+				SetDeployType(userinstalledtheme.DeployTypeSsr).
+				Save(ctx)
+
+			if err != nil {
+				log.Printf("[主题同步] 更新主题 %s 的 deploy_type 失败: %v", themeName, err)
+			}
+			continue
+		}
+
+		// 读取版本信息
+		version := ""
+		versionFile := filepath.Join(themePath, "version.txt")
+		if data, err := os.ReadFile(versionFile); err == nil {
+			version = strings.TrimSpace(string(data))
+		}
+
+		// 创建记录
+		_, err = s.db.UserInstalledTheme.
+			Create().
+			SetUserID(userID).
+			SetThemeName(themeName).
+			SetDeployType(userinstalledtheme.DeployTypeSsr).
+			SetInstallTime(time.Now()).
+			SetInstalledVersion(version).
+			SetIsCurrent(false).
+			Save(ctx)
+
+		if err != nil {
+			log.Printf("[主题同步] 创建主题 %s 记录失败: %v", themeName, err)
+			continue
+		}
+
+		synced++
+		log.Printf("[主题同步] 已同步 SSR 主题: %s (版本: %s)", themeName, version)
+	}
+
+	if synced > 0 {
+		log.Printf("[主题同步] 共同步 %d 个 SSR 主题到数据库", synced)
+	}
+
+	return nil
+}
+
+// GetSSRThemeCurrentStatus 获取 SSR 主题的 is_current 状态
+// 返回 map[themeName]isCurrent
+func (s *themeService) GetSSRThemeCurrentStatus(ctx context.Context, userID uint) (map[string]bool, error) {
+	// #region agent log
+	debugLog := func(msg string, data map[string]interface{}) {
+		f, _ := os.OpenFile("/Users/anzhiyu/Project/2025/anheyu-work/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if f != nil {
+			defer f.Close()
+			entry := map[string]interface{}{"location": "service.go:GetSSRThemeCurrentStatus", "message": msg, "data": data, "timestamp": time.Now().UnixMilli(), "sessionId": "debug-session", "hypothesisId": "C"}
+			jsonData, _ := json.Marshal(entry)
+			f.Write(append(jsonData, '\n'))
+		}
+	}
+	// #endregion
+
+	themes, err := s.db.UserInstalledTheme.
+		Query().
+		Where(
+			userinstalledtheme.UserID(userID),
+			userinstalledtheme.DeployTypeEQ(userinstalledtheme.DeployTypeSsr),
+		).
+		All(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("查询 SSR 主题状态失败: %w", err)
+	}
+
+	result := make(map[string]bool)
+	for _, theme := range themes {
+		result[theme.ThemeName] = theme.IsCurrent
+	}
+
+	// #region agent log
+	debugLog("查询SSR主题is_current状态", map[string]interface{}{"userID": userID, "result": result})
+	// #endregion
+
+	return result, nil
 }

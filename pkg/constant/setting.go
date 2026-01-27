@@ -194,6 +194,11 @@ const (
 	KeyPostCopyrightReprintTemplateWithUrl    SettingKey = "post.copyright.reprint_template_with_url"    // 转载文章版权声明模板（有原文链接）
 	KeyPostCopyrightReprintTemplateWithoutUrl SettingKey = "post.copyright.reprint_template_without_url" // 转载文章版权声明模板（无原文链接）
 
+	// 版权区域按钮全局开关
+	KeyPostCopyrightShowRewardButton    SettingKey = "post.copyright.show_reward_button"    // 是否显示打赏按钮
+	KeyPostCopyrightShowShareButton     SettingKey = "post.copyright.show_share_button"     // 是否显示分享按钮
+	KeyPostCopyrightShowSubscribeButton SettingKey = "post.copyright.show_subscribe_button" // 是否显示订阅按钮
+
 	// 文章订阅配置
 	KeyPostSubscribeEnable       SettingKey = "post.subscribe.enable"        // 是否启用订阅功能
 	KeyPostSubscribeButtonText   SettingKey = "post.subscribe.button_text"   // 订阅按钮文案
@@ -372,6 +377,11 @@ const (
 
 	// --- 人机验证配置 ---
 	KeyCaptchaProvider SettingKey = "captcha.provider" // 人机验证方式：turnstile / geetest / image / none
+
+	// --- 微信分享配置 ---
+	KeyWechatShareEnable    SettingKey = "wechat.share.enable"     // 是否启用微信分享功能
+	KeyWechatShareAppID     SettingKey = "wechat.share.app_id"     // 微信公众号 AppID
+	KeyWechatShareAppSecret SettingKey = "wechat.share.app_secret" // 微信公众号 AppSecret
 
 	// --- Cloudflare Turnstile 人机验证配置 ---
 	KeyTurnstileEnable    SettingKey = "turnstile.enable"     // 是否启用 Turnstile 人机验证（已废弃，使用 captcha.provider）

@@ -139,6 +139,20 @@ func (_c *UserInstalledThemeCreate) SetNillableInstalledVersion(v *string) *User
 	return _c
 }
 
+// SetDeployType sets the "deploy_type" field.
+func (_c *UserInstalledThemeCreate) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeCreate {
+	_c.mutation.SetDeployType(v)
+	return _c
+}
+
+// SetNillableDeployType sets the "deploy_type" field if the given value is not nil.
+func (_c *UserInstalledThemeCreate) SetNillableDeployType(v *userinstalledtheme.DeployType) *UserInstalledThemeCreate {
+	if v != nil {
+		_c.SetDeployType(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *UserInstalledThemeCreate) SetID(v uint) *UserInstalledThemeCreate {
 	_c.mutation.SetID(v)
@@ -212,6 +226,10 @@ func (_c *UserInstalledThemeCreate) defaults() error {
 		v := userinstalledtheme.DefaultInstallTime()
 		_c.mutation.SetInstallTime(v)
 	}
+	if _, ok := _c.mutation.DeployType(); !ok {
+		v := userinstalledtheme.DefaultDeployType
+		_c.mutation.SetDeployType(v)
+	}
 	return nil
 }
 
@@ -243,6 +261,14 @@ func (_c *UserInstalledThemeCreate) check() error {
 	if v, ok := _c.mutation.InstalledVersion(); ok {
 		if err := userinstalledtheme.InstalledVersionValidator(v); err != nil {
 			return &ValidationError{Name: "installed_version", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.installed_version": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.DeployType(); !ok {
+		return &ValidationError{Name: "deploy_type", err: errors.New(`ent: missing required field "UserInstalledTheme.deploy_type"`)}
+	}
+	if v, ok := _c.mutation.DeployType(); ok {
+		if err := userinstalledtheme.DeployTypeValidator(v); err != nil {
+			return &ValidationError{Name: "deploy_type", err: fmt.Errorf(`ent: validator failed for field "UserInstalledTheme.deploy_type": %w`, err)}
 		}
 	}
 	if len(_c.mutation.UserIDs()) == 0 {
@@ -316,6 +342,10 @@ func (_c *UserInstalledThemeCreate) createSpec() (*UserInstalledTheme, *sqlgraph
 	if value, ok := _c.mutation.InstalledVersion(); ok {
 		_spec.SetField(userinstalledtheme.FieldInstalledVersion, field.TypeString, value)
 		_node.InstalledVersion = value
+	}
+	if value, ok := _c.mutation.DeployType(); ok {
+		_spec.SetField(userinstalledtheme.FieldDeployType, field.TypeEnum, value)
+		_node.DeployType = value
 	}
 	if nodes := _c.mutation.UserIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -521,6 +551,18 @@ func (u *UserInstalledThemeUpsert) UpdateInstalledVersion() *UserInstalledThemeU
 // ClearInstalledVersion clears the value of the "installed_version" field.
 func (u *UserInstalledThemeUpsert) ClearInstalledVersion() *UserInstalledThemeUpsert {
 	u.SetNull(userinstalledtheme.FieldInstalledVersion)
+	return u
+}
+
+// SetDeployType sets the "deploy_type" field.
+func (u *UserInstalledThemeUpsert) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeUpsert {
+	u.Set(userinstalledtheme.FieldDeployType, v)
+	return u
+}
+
+// UpdateDeployType sets the "deploy_type" field to the value that was provided on create.
+func (u *UserInstalledThemeUpsert) UpdateDeployType() *UserInstalledThemeUpsert {
+	u.SetExcluded(userinstalledtheme.FieldDeployType)
 	return u
 }
 
@@ -733,6 +775,20 @@ func (u *UserInstalledThemeUpsertOne) UpdateInstalledVersion() *UserInstalledThe
 func (u *UserInstalledThemeUpsertOne) ClearInstalledVersion() *UserInstalledThemeUpsertOne {
 	return u.Update(func(s *UserInstalledThemeUpsert) {
 		s.ClearInstalledVersion()
+	})
+}
+
+// SetDeployType sets the "deploy_type" field.
+func (u *UserInstalledThemeUpsertOne) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeUpsertOne {
+	return u.Update(func(s *UserInstalledThemeUpsert) {
+		s.SetDeployType(v)
+	})
+}
+
+// UpdateDeployType sets the "deploy_type" field to the value that was provided on create.
+func (u *UserInstalledThemeUpsertOne) UpdateDeployType() *UserInstalledThemeUpsertOne {
+	return u.Update(func(s *UserInstalledThemeUpsert) {
+		s.UpdateDeployType()
 	})
 }
 
@@ -1111,6 +1167,20 @@ func (u *UserInstalledThemeUpsertBulk) UpdateInstalledVersion() *UserInstalledTh
 func (u *UserInstalledThemeUpsertBulk) ClearInstalledVersion() *UserInstalledThemeUpsertBulk {
 	return u.Update(func(s *UserInstalledThemeUpsert) {
 		s.ClearInstalledVersion()
+	})
+}
+
+// SetDeployType sets the "deploy_type" field.
+func (u *UserInstalledThemeUpsertBulk) SetDeployType(v userinstalledtheme.DeployType) *UserInstalledThemeUpsertBulk {
+	return u.Update(func(s *UserInstalledThemeUpsert) {
+		s.SetDeployType(v)
+	})
+}
+
+// UpdateDeployType sets the "deploy_type" field to the value that was provided on create.
+func (u *UserInstalledThemeUpsertBulk) UpdateDeployType() *UserInstalledThemeUpsertBulk {
+	return u.Update(func(s *UserInstalledThemeUpsert) {
+		s.UpdateDeployType()
 	})
 }
 

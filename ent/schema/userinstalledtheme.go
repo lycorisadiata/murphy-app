@@ -77,6 +77,10 @@ func (UserInstalledTheme) Fields() []ent.Field {
 			MaxLen(50).
 			Optional().
 			Comment("安装时的版本号（用于版本检查和更新提醒）"),
+		field.Enum("deploy_type").
+			Values("standard", "ssr").
+			Default("standard").
+			Comment("部署类型：standard-普通主题，ssr-SSR主题"),
 	}
 }
 
@@ -103,5 +107,7 @@ func (UserInstalledTheme) Indexes() []ent.Index {
 		index.Fields("user_id", "theme_name").Unique(),
 		// 主题商城ID索引（用于快速查找）
 		index.Fields("theme_market_id"),
+		// 部署类型索引（用于按类型筛选主题）
+		index.Fields("deploy_type"),
 	}
 }

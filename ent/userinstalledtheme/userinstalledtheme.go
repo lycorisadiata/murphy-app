@@ -3,6 +3,7 @@
 package userinstalledtheme
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent"
@@ -35,6 +36,8 @@ const (
 	FieldUserThemeConfig = "user_theme_config"
 	// FieldInstalledVersion holds the string denoting the installed_version field in the database.
 	FieldInstalledVersion = "installed_version"
+	// FieldDeployType holds the string denoting the deploy_type field in the database.
+	FieldDeployType = "deploy_type"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
 	// Table holds the table name of the userinstalledtheme in the database.
@@ -61,6 +64,7 @@ var Columns = []string{
 	FieldInstallTime,
 	FieldUserThemeConfig,
 	FieldInstalledVersion,
+	FieldDeployType,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -95,6 +99,32 @@ var (
 	// InstalledVersionValidator is a validator for the "installed_version" field. It is called by the builders before save.
 	InstalledVersionValidator func(string) error
 )
+
+// DeployType defines the type for the "deploy_type" enum field.
+type DeployType string
+
+// DeployTypeStandard is the default value of the DeployType enum.
+const DefaultDeployType = DeployTypeStandard
+
+// DeployType values.
+const (
+	DeployTypeStandard DeployType = "standard"
+	DeployTypeSsr      DeployType = "ssr"
+)
+
+func (dt DeployType) String() string {
+	return string(dt)
+}
+
+// DeployTypeValidator is a validator for the "deploy_type" field enum values. It is called by the builders before save.
+func DeployTypeValidator(dt DeployType) error {
+	switch dt {
+	case DeployTypeStandard, DeployTypeSsr:
+		return nil
+	default:
+		return fmt.Errorf("userinstalledtheme: invalid enum value for deploy_type field: %q", dt)
+	}
+}
 
 // OrderOption defines the ordering options for the UserInstalledTheme queries.
 type OrderOption func(*sql.Selector)
@@ -147,6 +177,11 @@ func ByInstallTime(opts ...sql.OrderTermOption) OrderOption {
 // ByInstalledVersion orders the results by the installed_version field.
 func ByInstalledVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInstalledVersion, opts...).ToFunc()
+}
+
+// ByDeployType orders the results by the deploy_type field.
+func ByDeployType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeployType, opts...).ToFunc()
 }
 
 // ByUserField orders the results by user field.

@@ -159,6 +159,7 @@ var AllSettings = []Definition{
 	{Key: constant.KeyPostRewardListButtonText, Value: "打赏者名单", Comment: "打赏者名单按钮文案", IsPublic: true},
 	{Key: constant.KeyPostRewardListButtonDesc, Value: "因为你们的支持让我意识到写文章的价值", Comment: "打赏者名单按钮描述文案", IsPublic: true},
 	{Key: constant.KeyPostCodeBlockCodeMaxLines, Value: "10", Comment: "代码块最大行数（超过会折叠）", IsPublic: true},
+	{Key: constant.KeyPostCodeBlockMacStyle, Value: "false", Comment: "是否启用Mac样式代码块 (true/false)，启用后显示红黄绿三个装饰圆点", IsPublic: true},
 
 	// 文章复制版权配置
 	{Key: constant.KeyPostCopyEnable, Value: "true", Comment: "是否允许复制文章内容 (true/false)，默认允许", IsPublic: true},
@@ -176,6 +177,11 @@ var AllSettings = []Definition{
 	{Key: constant.KeyPostCopyrightOriginalTemplate, Value: "", Comment: "原创文章版权声明模板，支持变量：{license}许可协议、{licenseUrl}协议链接、{author}作者、{siteUrl}站点链接", IsPublic: true},
 	{Key: constant.KeyPostCopyrightReprintTemplateWithUrl, Value: "", Comment: "转载文章版权声明模板（有原文链接），支持变量：{originalAuthor}原作者、{originalUrl}原文链接", IsPublic: true},
 	{Key: constant.KeyPostCopyrightReprintTemplateWithoutUrl, Value: "", Comment: "转载文章版权声明模板（无原文链接），支持变量：{originalAuthor}原作者", IsPublic: true},
+
+	// 版权区域按钮全局开关
+	{Key: constant.KeyPostCopyrightShowRewardButton, Value: "true", Comment: "是否显示打赏按钮 (true/false)，全局控制所有文章底部是否显示打赏按钮", IsPublic: true},
+	{Key: constant.KeyPostCopyrightShowShareButton, Value: "true", Comment: "是否显示分享按钮 (true/false)，全局控制所有文章底部是否显示分享按钮", IsPublic: true},
+	{Key: constant.KeyPostCopyrightShowSubscribeButton, Value: "true", Comment: "是否显示订阅按钮 (true/false)，全局控制所有文章底部是否显示订阅按钮", IsPublic: true},
 
 	// 文章订阅配置
 	{Key: constant.KeyPostSubscribeEnable, Value: "false", Comment: "是否启用文章订阅功能 (true/false)", IsPublic: true},
@@ -477,6 +483,11 @@ var AllSettings = []Definition{
 
 	// --- 人机验证配置 ---
 	{Key: constant.KeyCaptchaProvider, Value: "none", Comment: "人机验证方式: none(不启用) / turnstile(Cloudflare Turnstile) / geetest(极验4.0) / image(系统图形验证码)", IsPublic: true},
+
+	// --- 微信分享配置 ---
+	{Key: constant.KeyWechatShareEnable, Value: "false", Comment: "是否启用微信分享功能 (true/false)", IsPublic: true},
+	{Key: constant.KeyWechatShareAppID, Value: "", Comment: "微信公众号 AppID", IsPublic: true},
+	{Key: constant.KeyWechatShareAppSecret, Value: "", Comment: "微信公众号 AppSecret（用于生成 JS-SDK 签名）", IsPublic: false},
 
 	// --- Cloudflare Turnstile 人机验证配置 ---
 	{Key: constant.KeyTurnstileEnable, Value: "false", Comment: "是否启用 Cloudflare Turnstile 人机验证 (true/false)，已废弃，请使用 captcha.provider", IsPublic: true},

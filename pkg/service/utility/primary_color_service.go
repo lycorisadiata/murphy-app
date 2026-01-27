@@ -29,6 +29,7 @@ type PrimaryColorService struct {
 	colorSvc          *ColorService
 	settingSvc        setting.SettingService
 	fileRepo          repository.FileRepository
+	directLinkRepo    repository.DirectLinkRepository
 	storagePolicyRepo repository.StoragePolicyRepository
 	httpClient        *http.Client
 	storageProviders  map[constant.StoragePolicyType]storage.IStorageProvider
@@ -39,6 +40,7 @@ func NewPrimaryColorService(
 	colorSvc *ColorService,
 	settingSvc setting.SettingService,
 	fileRepo repository.FileRepository,
+	directLinkRepo repository.DirectLinkRepository,
 	storagePolicyRepo repository.StoragePolicyRepository,
 	httpClient *http.Client,
 	storageProviders map[constant.StoragePolicyType]storage.IStorageProvider,
@@ -47,6 +49,7 @@ func NewPrimaryColorService(
 		colorSvc:          colorSvc,
 		settingSvc:        settingSvc,
 		fileRepo:          fileRepo,
+		directLinkRepo:    directLinkRepo,
 		storagePolicyRepo: storagePolicyRepo,
 		httpClient:        httpClient,
 		storageProviders:  storageProviders,
@@ -166,22 +169,41 @@ func (s *PrimaryColorService) isMiyousheImage(imageURL string) bool {
 
 // getColorFromSystemFile 从系统内的文件获取主色调
 func (s *PrimaryColorService) getColorFromSystemFile(ctx context.Context, filePublicID string) string {
-	// 解码文件公共ID
-	fileID, entityType, err := idgen.DecodePublicID(filePublicID)
+	// 解码公共ID
+	entityID, entityType, err := idgen.DecodePublicID(filePublicID)
 	if err != nil {
-		log.Printf("[主色调服务] 解码文件ID失败: %v，返回空字符串", err)
+		log.Printf("[主色调服务] 解码ID失败: %v，返回空字符串", err)
 		return ""
 	}
 
-	if entityType != idgen.EntityTypeFile {
-		log.Printf("[主色调服务] ID类型不是文件类型: %v，返回空字符串", entityType)
-		return ""
-	}
+	var file *model.File
 
-	// 查找文件信息
-	file, err := s.fileRepo.FindByID(ctx, fileID)
-	if err != nil {
-		log.Printf("[主色调服务] 查找文件失败: %v，返回空字符串", err)
+	// 根据实体类型获取文件信息
+	switch entityType {
+	case idgen.EntityTypeFile:
+		// 直接是文件类型
+		log.Printf("[主色调服务] ID类型为文件，FileID: %d", entityID)
+		file, err = s.fileRepo.FindByID(ctx, entityID)
+		if err != nil {
+			log.Printf("[主色调服务] 查找文件失败: %v，返回空字符串", err)
+			return ""
+		}
+	case idgen.EntityTypeDirectLink:
+		// 直链类型，需要先获取直链关联的文件
+		log.Printf("[主色调服务] ID类型为直链，DirectLinkID: %d，正在查找关联文件...", entityID)
+		directLink, err := s.directLinkRepo.FindByPublicID(ctx, filePublicID)
+		if err != nil {
+			log.Printf("[主色调服务] 查找直链失败: %v，返回空字符串", err)
+			return ""
+		}
+		if directLink == nil || directLink.File == nil {
+			log.Printf("[主色调服务] 直链或关联文件不存在，返回空字符串")
+			return ""
+		}
+		file = directLink.File
+		log.Printf("[主色调服务] 通过直链找到关联文件，FileID: %d", file.ID)
+	default:
+		log.Printf("[主色调服务] 不支持的ID类型: %v，返回空字符串", entityType)
 		return ""
 	}
 

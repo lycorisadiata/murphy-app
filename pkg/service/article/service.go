@@ -605,6 +605,7 @@ func (s *serviceImpl) ToAPIResponse(a *model.Article, useAbbrlinkAsID bool, incl
 		Summaries:            a.Summaries,
 		Abbrlink:             a.Abbrlink,
 		Copyright:            a.Copyright,
+		IsReprint:            a.IsReprint,
 		CopyrightAuthor:      a.CopyrightAuthor,
 		CopyrightAuthorHref:  a.CopyrightAuthorHref,
 		CopyrightURL:         a.CopyrightURL,
@@ -1017,6 +1018,11 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 			copyright = *req.Copyright
 		}
 
+		isReprint := false
+		if req.IsReprint != nil {
+			isReprint = *req.IsReprint
+		}
+
 		showOnHome := true
 		if req.ShowOnHome != nil {
 			showOnHome = *req.ShowOnHome
@@ -1115,6 +1121,7 @@ func (s *serviceImpl) Create(ctx context.Context, req *model.CreateArticleReques
 			ShowOnHome:           showOnHome,
 			Abbrlink:             req.Abbrlink,
 			Copyright:            copyright,
+			IsReprint:            isReprint,
 			CopyrightAuthor:      req.CopyrightAuthor,
 			CopyrightAuthorHref:  req.CopyrightAuthorHref,
 			CopyrightURL:         req.CopyrightURL,
@@ -1723,7 +1730,11 @@ func (s *serviceImpl) ListPublic(ctx context.Context, options *model.ListPublicA
 	list := make([]model.ArticleResponse, len(articles))
 	ownerCache := make(map[uint]string)
 	for i, a := range articles {
-		a.ContentMd = ""
+		// 只在不需要内容时清空 ContentMd（用于普通列表展示）
+		// 当 WithContent=true 时保留内容（用于知识库同步等场景）
+		if !options.WithContent {
+			a.ContentMd = ""
+		}
 		resp := s.ToAPIResponse(a, true, false)
 		s.fillOwnerNickname(ctx, resp, ownerCache)
 		list[i] = *resp

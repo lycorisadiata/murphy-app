@@ -88,6 +88,7 @@ var (
 		{Name: "summaries", Type: field.TypeJSON, Nullable: true, Comment: "文章摘要列表，用于随机摘要功能"},
 		{Name: "abbrlink", Type: field.TypeString, Unique: true, Nullable: true, Comment: "永久链接，用于替换ID，需要保证唯一性"},
 		{Name: "copyright", Type: field.TypeBool, Comment: "是否显示版权信息", Default: true},
+		{Name: "is_reprint", Type: field.TypeBool, Comment: "是否为转载文章", Default: false},
 		{Name: "copyright_author", Type: field.TypeString, Nullable: true, Comment: "版权作者"},
 		{Name: "copyright_author_href", Type: field.TypeString, Nullable: true, Comment: "版权作者链接"},
 		{Name: "copyright_url", Type: field.TypeString, Nullable: true, Comment: "版权来源链接"},
@@ -105,6 +106,9 @@ var (
 		{Name: "exclude_from_membership", Type: field.TypeBool, Comment: "是否排除在会员权益外：true表示会员也需要单独购买此文章", Default: false},
 		{Name: "is_doc", Type: field.TypeBool, Comment: "是否为文档模式：文档模式的文章会在文档页面展示", Default: false},
 		{Name: "doc_sort", Type: field.TypeInt, Comment: "文档在系列中的排序，数值越小越靠前", Default: 0},
+		{Name: "show_reward_button", Type: field.TypeBool, Comment: "是否显示打赏作者按钮", Default: true},
+		{Name: "show_share_button", Type: field.TypeBool, Comment: "是否显示分享按钮", Default: true},
+		{Name: "show_subscribe_button", Type: field.TypeBool, Comment: "是否显示订阅按钮", Default: true},
 		{Name: "doc_series_id", Type: field.TypeUint, Nullable: true, Comment: "文档系列ID，关联到doc_series表"},
 	}
 	// ArticlesTable holds the schema information for the "articles" table.
@@ -116,7 +120,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "articles_doc_series_articles",
-				Columns:    []*schema.Column{ArticlesColumns[40]},
+				Columns:    []*schema.Column{ArticlesColumns[44]},
 				RefColumns: []*schema.Column{DocSeriesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -772,6 +776,7 @@ var (
 		{Name: "install_time", Type: field.TypeTime, Comment: "安装时间"},
 		{Name: "user_theme_config", Type: field.TypeJSON, Nullable: true, Comment: "用户个性化主题配置（覆盖默认配置）"},
 		{Name: "installed_version", Type: field.TypeString, Nullable: true, Size: 50, Comment: "安装时的版本号（用于版本检查和更新提醒）"},
+		{Name: "deploy_type", Type: field.TypeEnum, Comment: "部署类型：standard-普通主题，ssr-SSR主题", Enums: []string{"standard", "ssr"}, Default: "standard"},
 		{Name: "user_id", Type: field.TypeUint, Comment: "用户ID"},
 	}
 	// UserInstalledThemesTable holds the schema information for the "user_installed_themes" table.
@@ -783,7 +788,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "user_installed_themes_users_installed_themes",
-				Columns:    []*schema.Column{UserInstalledThemesColumns[10]},
+				Columns:    []*schema.Column{UserInstalledThemesColumns[11]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -792,7 +797,7 @@ var (
 			{
 				Name:    "userinstalledtheme_user_id_is_current",
 				Unique:  false,
-				Columns: []*schema.Column{UserInstalledThemesColumns[10], UserInstalledThemesColumns[6]},
+				Columns: []*schema.Column{UserInstalledThemesColumns[11], UserInstalledThemesColumns[6]},
 			},
 			{
 				Name:    "userinstalledtheme_theme_name",
@@ -802,12 +807,17 @@ var (
 			{
 				Name:    "userinstalledtheme_user_id_theme_name",
 				Unique:  true,
-				Columns: []*schema.Column{UserInstalledThemesColumns[10], UserInstalledThemesColumns[4]},
+				Columns: []*schema.Column{UserInstalledThemesColumns[11], UserInstalledThemesColumns[4]},
 			},
 			{
 				Name:    "userinstalledtheme_theme_market_id",
 				Unique:  false,
 				Columns: []*schema.Column{UserInstalledThemesColumns[5]},
+			},
+			{
+				Name:    "userinstalledtheme_deploy_type",
+				Unique:  false,
+				Columns: []*schema.Column{UserInstalledThemesColumns[10]},
 			},
 		},
 	}

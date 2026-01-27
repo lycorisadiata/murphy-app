@@ -39,6 +39,8 @@ type UserInstalledTheme struct {
 	UserThemeConfig map[string]interface{} `json:"user_theme_config,omitempty"`
 	// 安装时的版本号（用于版本检查和更新提醒）
 	InstalledVersion string `json:"installed_version,omitempty"`
+	// 部署类型：standard-普通主题，ssr-SSR主题
+	DeployType userinstalledtheme.DeployType `json:"deploy_type,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserInstalledThemeQuery when eager-loading is set.
 	Edges        UserInstalledThemeEdges `json:"edges"`
@@ -76,7 +78,7 @@ func (*UserInstalledTheme) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case userinstalledtheme.FieldID, userinstalledtheme.FieldUserID, userinstalledtheme.FieldThemeMarketID:
 			values[i] = new(sql.NullInt64)
-		case userinstalledtheme.FieldThemeName, userinstalledtheme.FieldInstalledVersion:
+		case userinstalledtheme.FieldThemeName, userinstalledtheme.FieldInstalledVersion, userinstalledtheme.FieldDeployType:
 			values[i] = new(sql.NullString)
 		case userinstalledtheme.FieldDeletedAt, userinstalledtheme.FieldCreatedAt, userinstalledtheme.FieldUpdatedAt, userinstalledtheme.FieldInstallTime:
 			values[i] = new(sql.NullTime)
@@ -164,6 +166,12 @@ func (_m *UserInstalledTheme) assignValues(columns []string, values []any) error
 			} else if value.Valid {
 				_m.InstalledVersion = value.String
 			}
+		case userinstalledtheme.FieldDeployType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field deploy_type", values[i])
+			} else if value.Valid {
+				_m.DeployType = userinstalledtheme.DeployType(value.String)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -236,6 +244,9 @@ func (_m *UserInstalledTheme) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("installed_version=")
 	builder.WriteString(_m.InstalledVersion)
+	builder.WriteString(", ")
+	builder.WriteString("deploy_type=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DeployType))
 	builder.WriteByte(')')
 	return builder.String()
 }

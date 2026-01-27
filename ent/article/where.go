@@ -155,6 +155,11 @@ func Copyright(v bool) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldCopyright, v))
 }
 
+// IsReprint applies equality check predicate on the "is_reprint" field. It's identical to IsReprintEQ.
+func IsReprint(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldIsReprint, v))
+}
+
 // CopyrightAuthor applies equality check predicate on the "copyright_author" field. It's identical to CopyrightAuthorEQ.
 func CopyrightAuthor(v string) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldCopyrightAuthor, v))
@@ -233,6 +238,21 @@ func DocSeriesID(v uint) predicate.Article {
 // DocSort applies equality check predicate on the "doc_sort" field. It's identical to DocSortEQ.
 func DocSort(v int) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldDocSort, v))
+}
+
+// ShowRewardButton applies equality check predicate on the "show_reward_button" field. It's identical to ShowRewardButtonEQ.
+func ShowRewardButton(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowRewardButton, v))
+}
+
+// ShowShareButton applies equality check predicate on the "show_share_button" field. It's identical to ShowShareButtonEQ.
+func ShowShareButton(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowShareButton, v))
+}
+
+// ShowSubscribeButton applies equality check predicate on the "show_subscribe_button" field. It's identical to ShowSubscribeButtonEQ.
+func ShowSubscribeButton(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowSubscribeButton, v))
 }
 
 // DeletedAtEQ applies the EQ predicate on the "deleted_at" field.
@@ -1255,6 +1275,16 @@ func CopyrightNEQ(v bool) predicate.Article {
 	return predicate.Article(sql.FieldNEQ(FieldCopyright, v))
 }
 
+// IsReprintEQ applies the EQ predicate on the "is_reprint" field.
+func IsReprintEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldIsReprint, v))
+}
+
+// IsReprintNEQ applies the NEQ predicate on the "is_reprint" field.
+func IsReprintNEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldIsReprint, v))
+}
+
 // CopyrightAuthorEQ applies the EQ predicate on the "copyright_author" field.
 func CopyrightAuthorEQ(v string) predicate.Article {
 	return predicate.Article(sql.FieldEQ(FieldCopyrightAuthor, v))
@@ -2083,6 +2113,36 @@ func DocSortLT(v int) predicate.Article {
 // DocSortLTE applies the LTE predicate on the "doc_sort" field.
 func DocSortLTE(v int) predicate.Article {
 	return predicate.Article(sql.FieldLTE(FieldDocSort, v))
+}
+
+// ShowRewardButtonEQ applies the EQ predicate on the "show_reward_button" field.
+func ShowRewardButtonEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowRewardButton, v))
+}
+
+// ShowRewardButtonNEQ applies the NEQ predicate on the "show_reward_button" field.
+func ShowRewardButtonNEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldShowRewardButton, v))
+}
+
+// ShowShareButtonEQ applies the EQ predicate on the "show_share_button" field.
+func ShowShareButtonEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowShareButton, v))
+}
+
+// ShowShareButtonNEQ applies the NEQ predicate on the "show_share_button" field.
+func ShowShareButtonNEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldShowShareButton, v))
+}
+
+// ShowSubscribeButtonEQ applies the EQ predicate on the "show_subscribe_button" field.
+func ShowSubscribeButtonEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldEQ(FieldShowSubscribeButton, v))
+}
+
+// ShowSubscribeButtonNEQ applies the NEQ predicate on the "show_subscribe_button" field.
+func ShowSubscribeButtonNEQ(v bool) predicate.Article {
+	return predicate.Article(sql.FieldNEQ(FieldShowSubscribeButton, v))
 }
 
 // HasPostTags applies the HasEdge predicate on the "post_tags" edge.

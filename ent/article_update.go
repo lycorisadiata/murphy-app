@@ -437,6 +437,20 @@ func (_u *ArticleUpdate) SetNillableCopyright(v *bool) *ArticleUpdate {
 	return _u
 }
 
+// SetIsReprint sets the "is_reprint" field.
+func (_u *ArticleUpdate) SetIsReprint(v bool) *ArticleUpdate {
+	_u.mutation.SetIsReprint(v)
+	return _u
+}
+
+// SetNillableIsReprint sets the "is_reprint" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableIsReprint(v *bool) *ArticleUpdate {
+	if v != nil {
+		_u.SetIsReprint(*v)
+	}
+	return _u
+}
+
 // SetCopyrightAuthor sets the "copyright_author" field.
 func (_u *ArticleUpdate) SetCopyrightAuthor(v string) *ArticleUpdate {
 	_u.mutation.SetCopyrightAuthor(v)
@@ -777,6 +791,48 @@ func (_u *ArticleUpdate) SetNillableDocSort(v *int) *ArticleUpdate {
 // AddDocSort adds value to the "doc_sort" field.
 func (_u *ArticleUpdate) AddDocSort(v int) *ArticleUpdate {
 	_u.mutation.AddDocSort(v)
+	return _u
+}
+
+// SetShowRewardButton sets the "show_reward_button" field.
+func (_u *ArticleUpdate) SetShowRewardButton(v bool) *ArticleUpdate {
+	_u.mutation.SetShowRewardButton(v)
+	return _u
+}
+
+// SetNillableShowRewardButton sets the "show_reward_button" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableShowRewardButton(v *bool) *ArticleUpdate {
+	if v != nil {
+		_u.SetShowRewardButton(*v)
+	}
+	return _u
+}
+
+// SetShowShareButton sets the "show_share_button" field.
+func (_u *ArticleUpdate) SetShowShareButton(v bool) *ArticleUpdate {
+	_u.mutation.SetShowShareButton(v)
+	return _u
+}
+
+// SetNillableShowShareButton sets the "show_share_button" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableShowShareButton(v *bool) *ArticleUpdate {
+	if v != nil {
+		_u.SetShowShareButton(*v)
+	}
+	return _u
+}
+
+// SetShowSubscribeButton sets the "show_subscribe_button" field.
+func (_u *ArticleUpdate) SetShowSubscribeButton(v bool) *ArticleUpdate {
+	_u.mutation.SetShowSubscribeButton(v)
+	return _u
+}
+
+// SetNillableShowSubscribeButton sets the "show_subscribe_button" field if the given value is not nil.
+func (_u *ArticleUpdate) SetNillableShowSubscribeButton(v *bool) *ArticleUpdate {
+	if v != nil {
+		_u.SetShowSubscribeButton(*v)
+	}
 	return _u
 }
 
@@ -1151,6 +1207,9 @@ func (_u *ArticleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Copyright(); ok {
 		_spec.SetField(article.FieldCopyright, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.IsReprint(); ok {
+		_spec.SetField(article.FieldIsReprint, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.CopyrightAuthor(); ok {
 		_spec.SetField(article.FieldCopyrightAuthor, field.TypeString, value)
 	}
@@ -1246,6 +1305,15 @@ func (_u *ArticleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedDocSort(); ok {
 		_spec.AddField(article.FieldDocSort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ShowRewardButton(); ok {
+		_spec.SetField(article.FieldShowRewardButton, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ShowShareButton(); ok {
+		_spec.SetField(article.FieldShowShareButton, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ShowSubscribeButton(); ok {
+		_spec.SetField(article.FieldShowSubscribeButton, field.TypeBool, value)
 	}
 	if _u.mutation.PostTagsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1880,6 +1948,20 @@ func (_u *ArticleUpdateOne) SetNillableCopyright(v *bool) *ArticleUpdateOne {
 	return _u
 }
 
+// SetIsReprint sets the "is_reprint" field.
+func (_u *ArticleUpdateOne) SetIsReprint(v bool) *ArticleUpdateOne {
+	_u.mutation.SetIsReprint(v)
+	return _u
+}
+
+// SetNillableIsReprint sets the "is_reprint" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableIsReprint(v *bool) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetIsReprint(*v)
+	}
+	return _u
+}
+
 // SetCopyrightAuthor sets the "copyright_author" field.
 func (_u *ArticleUpdateOne) SetCopyrightAuthor(v string) *ArticleUpdateOne {
 	_u.mutation.SetCopyrightAuthor(v)
@@ -2220,6 +2302,48 @@ func (_u *ArticleUpdateOne) SetNillableDocSort(v *int) *ArticleUpdateOne {
 // AddDocSort adds value to the "doc_sort" field.
 func (_u *ArticleUpdateOne) AddDocSort(v int) *ArticleUpdateOne {
 	_u.mutation.AddDocSort(v)
+	return _u
+}
+
+// SetShowRewardButton sets the "show_reward_button" field.
+func (_u *ArticleUpdateOne) SetShowRewardButton(v bool) *ArticleUpdateOne {
+	_u.mutation.SetShowRewardButton(v)
+	return _u
+}
+
+// SetNillableShowRewardButton sets the "show_reward_button" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableShowRewardButton(v *bool) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetShowRewardButton(*v)
+	}
+	return _u
+}
+
+// SetShowShareButton sets the "show_share_button" field.
+func (_u *ArticleUpdateOne) SetShowShareButton(v bool) *ArticleUpdateOne {
+	_u.mutation.SetShowShareButton(v)
+	return _u
+}
+
+// SetNillableShowShareButton sets the "show_share_button" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableShowShareButton(v *bool) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetShowShareButton(*v)
+	}
+	return _u
+}
+
+// SetShowSubscribeButton sets the "show_subscribe_button" field.
+func (_u *ArticleUpdateOne) SetShowSubscribeButton(v bool) *ArticleUpdateOne {
+	_u.mutation.SetShowSubscribeButton(v)
+	return _u
+}
+
+// SetNillableShowSubscribeButton sets the "show_subscribe_button" field if the given value is not nil.
+func (_u *ArticleUpdateOne) SetNillableShowSubscribeButton(v *bool) *ArticleUpdateOne {
+	if v != nil {
+		_u.SetShowSubscribeButton(*v)
+	}
 	return _u
 }
 
@@ -2624,6 +2748,9 @@ func (_u *ArticleUpdateOne) sqlSave(ctx context.Context) (_node *Article, err er
 	if value, ok := _u.mutation.Copyright(); ok {
 		_spec.SetField(article.FieldCopyright, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.IsReprint(); ok {
+		_spec.SetField(article.FieldIsReprint, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.CopyrightAuthor(); ok {
 		_spec.SetField(article.FieldCopyrightAuthor, field.TypeString, value)
 	}
@@ -2719,6 +2846,15 @@ func (_u *ArticleUpdateOne) sqlSave(ctx context.Context) (_node *Article, err er
 	}
 	if value, ok := _u.mutation.AddedDocSort(); ok {
 		_spec.AddField(article.FieldDocSort, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ShowRewardButton(); ok {
+		_spec.SetField(article.FieldShowRewardButton, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ShowShareButton(); ok {
+		_spec.SetField(article.FieldShowShareButton, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.ShowSubscribeButton(); ok {
+		_spec.SetField(article.FieldShowSubscribeButton, field.TypeBool, value)
 	}
 	if _u.mutation.PostTagsCleared() {
 		edge := &sqlgraph.EdgeSpec{

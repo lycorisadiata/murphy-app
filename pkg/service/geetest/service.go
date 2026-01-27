@@ -7,7 +7,6 @@
 package geetest
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -16,6 +15,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
@@ -51,15 +51,6 @@ func NewGeetestService(settingSvc setting.SettingService) GeetestService {
 			Timeout: 10 * time.Second,
 		},
 	}
-}
-
-// GeetestVerifyRequest 定义发送给极验的验证请求
-type GeetestVerifyRequest struct {
-	LotNumber     string `json:"lot_number"`
-	CaptchaOutput string `json:"captcha_output"`
-	PassToken     string `json:"pass_token"`
-	GenTime       string `json:"gen_time"`
-	SignToken     string `json:"sign_token"`
 }
 
 // GeetestVerifyResponse 定义极验返回的验证响应
@@ -108,29 +99,23 @@ func (s *geetestService) Verify(ctx context.Context, lotNumber, captchaOutput, p
 	// 使用 HMAC-SHA256 算法，以 lot_number 为消息，captcha_key 为密钥
 	signToken := generateSignToken(lotNumber, captchaKey)
 
-	// 构建请求体
-	reqBody := GeetestVerifyRequest{
-		LotNumber:     lotNumber,
-		CaptchaOutput: captchaOutput,
-		PassToken:     passToken,
-		GenTime:       genTime,
-		SignToken:     signToken,
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		return errors.New("人机验证请求构建失败")
-	}
-
 	// 构建请求 URL（captcha_id 作为查询参数）
 	reqURL := GeetestVerifyURL + "?captcha_id=" + url.QueryEscape(captchaId)
 
+	// 构建 form-urlencoded 请求体（极验 v4 API 要求使用 form 格式而非 JSON）
+	formData := url.Values{}
+	formData.Set("lot_number", lotNumber)
+	formData.Set("captcha_output", captchaOutput)
+	formData.Set("pass_token", passToken)
+	formData.Set("gen_time", genTime)
+	formData.Set("sign_token", signToken)
+
 	// 发送验证请求
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return errors.New("人机验证请求创建失败")
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -155,7 +140,9 @@ func (s *geetestService) Verify(ctx context.Context, lotNumber, captchaOutput, p
 	if verifyResp.Status == "error" {
 		switch verifyResp.Code {
 		case "-50005":
-			return errors.New("人机验证参数无效")
+			return errors.New("人机验证参数无效：gen_time 格式错误")
+		case "-50004":
+			return errors.New("人机验证参数无效：sign_token 验证失败")
 		default:
 			if verifyResp.Msg != "" {
 				return errors.New("人机验证失败：" + verifyResp.Msg)

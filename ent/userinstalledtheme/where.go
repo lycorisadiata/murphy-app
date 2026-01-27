@@ -500,6 +500,26 @@ func InstalledVersionContainsFold(v string) predicate.UserInstalledTheme {
 	return predicate.UserInstalledTheme(sql.FieldContainsFold(FieldInstalledVersion, v))
 }
 
+// DeployTypeEQ applies the EQ predicate on the "deploy_type" field.
+func DeployTypeEQ(v DeployType) predicate.UserInstalledTheme {
+	return predicate.UserInstalledTheme(sql.FieldEQ(FieldDeployType, v))
+}
+
+// DeployTypeNEQ applies the NEQ predicate on the "deploy_type" field.
+func DeployTypeNEQ(v DeployType) predicate.UserInstalledTheme {
+	return predicate.UserInstalledTheme(sql.FieldNEQ(FieldDeployType, v))
+}
+
+// DeployTypeIn applies the In predicate on the "deploy_type" field.
+func DeployTypeIn(vs ...DeployType) predicate.UserInstalledTheme {
+	return predicate.UserInstalledTheme(sql.FieldIn(FieldDeployType, vs...))
+}
+
+// DeployTypeNotIn applies the NotIn predicate on the "deploy_type" field.
+func DeployTypeNotIn(vs ...DeployType) predicate.UserInstalledTheme {
+	return predicate.UserInstalledTheme(sql.FieldNotIn(FieldDeployType, vs...))
+}
+
 // HasUser applies the HasEdge predicate on the "user" edge.
 func HasUser() predicate.UserInstalledTheme {
 	return predicate.UserInstalledTheme(func(s *sql.Selector) {

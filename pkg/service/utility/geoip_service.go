@@ -2,7 +2,7 @@
  * @Description: IP地理位置查询服务，仅支持远程API查询。
  * @Author: 安知鱼
  * @Date: 2025-07-25 16:15:59
- * @LastEditTime: 2025-08-27 21:34:38
+ * @LastEditTime: 2026-01-24 13:53:14
  * @LastEditors: 安知鱼
  */
 package utility
@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
@@ -45,28 +46,53 @@ type GeoIPResult struct {
 
 // apiResponse 定义了远程 IP API 返回的 JSON 数据的结构。
 // 适配 NSUUU ipip API（全球 IPv4/IPv6 信息查询）
+// 注意：data 字段可能是对象（正常情况）或字符串（内网IP/无法识别的IP/错误信息），使用 json.RawMessage 处理
 type apiResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		IP        string `json:"ip"`
-		Country   string `json:"country"`
-		Province  string `json:"province"`
-		City      string `json:"city"`
-		ISP       string `json:"isp"`
-		Latitude  string `json:"latitude"`
-		Longitude string `json:"longitude"`
-		Address   string `json:"address"`
-	} `json:"data"`
-	RequestID string `json:"request_id"`
+	Code      int             `json:"code"`
+	Message   string          `json:"message"`
+	Msg       string          `json:"msg"`  // 错误响应时使用 msg 字段
+	Data      json.RawMessage `json:"data"` // 可能是对象或字符串
+	RequestID string          `json:"request_id"`
 }
 
-// apiKeyErrorResponse 定义了远程 IP API 密钥错误时查询返回的 JSON 数据的结构。
-type apiKeyErrorResponse struct {
-	Code      int    `json:"code"`
-	Msg       string `json:"msg"`
-	Data      string `json:"data"`
-	RequestID string `json:"request_id"`
+// apiDataObject 定义了 data 字段为对象时的结构
+type apiDataObject struct {
+	IP        string `json:"ip"`
+	Country   string `json:"country"`
+	Province  string `json:"province"`
+	City      string `json:"city"`
+	ISP       string `json:"isp"`
+	Latitude  string `json:"latitude"`
+	Longitude string `json:"longitude"`
+	Address   string `json:"address"`
+}
+
+// parseAPIData 解析 API 响应中的 data 字段
+// 返回解析后的数据对象，如果 data 是字符串则返回错误
+func parseAPIData(rawData json.RawMessage) (*apiDataObject, error) {
+	if len(rawData) == 0 {
+		return nil, fmt.Errorf("data 字段为空")
+	}
+
+	// 检查 data 是否是字符串（以引号开头）
+	if rawData[0] == '"' {
+		var dataStr string
+		if err := json.Unmarshal(rawData, &dataStr); err == nil {
+			// data 是字符串，说明是错误信息或无法识别的IP
+			if dataStr == "" {
+				return nil, fmt.Errorf("无效的IP地址或内网IP")
+			}
+			return nil, fmt.Errorf("API返回错误: %s", dataStr)
+		}
+	}
+
+	// 尝试解析为对象
+	var dataObj apiDataObject
+	if err := json.Unmarshal(rawData, &dataObj); err != nil {
+		return nil, fmt.Errorf("解析 data 字段失败: %w", err)
+	}
+
+	return &dataObj, nil
 }
 
 // smartGeoIPService 是现在唯一的服务实现，仅通过远程API查询。
@@ -91,17 +117,17 @@ func NewGeoIPService(settingSvc setting.SettingService) (GeoIPService, error) {
 func (s *smartGeoIPService) Lookup(ipStr string, referer string) (string, error) {
 	log.Printf("[IP属地查询] 开始查询IP地址: %s, Referer: %s", ipStr, referer)
 
-	apiURL := s.settingSvc.Get(constant.KeyIPAPI.String())
-	apiToken := s.settingSvc.Get(constant.KeyIPAPIToKen.String())
+	apiURL := strings.TrimSpace(s.settingSvc.Get(constant.KeyIPAPI.String()))
+	apiToken := strings.TrimSpace(s.settingSvc.Get(constant.KeyIPAPIToKen.String()))
 
 	// 如果 API 和 Token 未配置，则直接返回错误
 	if apiURL == "" || apiToken == "" {
-		log.Printf("[IP属地查询] ❌ IP属地查询失败 - IP: %s, 原因: 远程API未配置 (apiURL: %s, apiToken配置: %t)",
-			ipStr, apiURL, apiToken != "")
+		log.Printf("[IP属地查询] ❌ IP属地查询失败 - IP: %s, 原因: 远程API未配置 (apiURL: %s, apiToken长度: %d)",
+			ipStr, apiURL, len(apiToken))
 		return "未知", fmt.Errorf("IP 查询失败：远程 API 未配置")
 	}
 
-	log.Printf("[IP属地查询] API配置检查通过 - URL: %s, Token已配置: %t", apiURL, apiToken != "")
+	log.Printf("[IP属地查询] API配置检查通过 - URL: %s, Token长度: %d, Token前4位: %s***", apiURL, len(apiToken), apiToken[:min(4, len(apiToken))])
 
 	location, err := s.lookupViaAPI(apiURL, apiToken, ipStr, referer)
 	if err != nil {
@@ -162,32 +188,40 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr, referer string
 	// 打印 API 原始返回内容，便于调试
 	log.Printf("[IP属地查询] API原始返回内容 - IP: %s, 响应体: %s", ipStr, string(body))
 
-	// 1. 尝试解析为apiKeyErrorResponse（检查是否是 API KEY 错误）
-	var keyErrorResult apiKeyErrorResponse
-	if err := json.Unmarshal(body, &keyErrorResult); err == nil && keyErrorResult.Code < 0 {
-		// 只有当解析成功且 Code 为负数时才认为是 API KEY 错误
-		log.Printf("[IP属地查询] ❌ API KEY错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, keyErrorResult.Code, keyErrorResult.Msg)
-		return "", fmt.Errorf("API KEY配置错误: %s", keyErrorResult.Msg)
-	}
-
-	// 2. 上述错误结构无法解析，尝试解析为正常响应
+	// 解析 API 响应
 	var result apiResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		// 如果这里也解析失败，才报告JSON解析失败
 		log.Printf("[IP属地查询] ❌ 解析API响应JSON失败 - IP: %s, 错误: %v", ipStr, err)
 		return "", fmt.Errorf("解析API响应JSON失败: %w", err)
 	}
 
-	log.Printf("[IP属地查询] API响应解析成功 - IP: %s, 业务码: %d, 国家: %s, 省份: %s, 城市: %s",
-		ipStr, result.Code, result.Data.Country, result.Data.Province, result.Data.City)
+	// 检查是否是错误响应（code 为负数表示错误）
+	if result.Code < 0 {
+		errMsg := result.Msg
+		if errMsg == "" {
+			errMsg = result.Message
+		}
+		log.Printf("[IP属地查询] ❌ API返回错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, result.Code, errMsg)
+		return "", fmt.Errorf("API错误: %s", errMsg)
+	}
 
 	if result.Code != 200 {
 		log.Printf("[IP属地查询] ❌ API返回业务错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, result.Code, result.Message)
 		return "", fmt.Errorf("API 返回业务错误码: %d, 信息: %s", result.Code, result.Message)
 	}
 
-	province := result.Data.Province
-	city := result.Data.City
+	// 解析 data 字段
+	dataObj, err := parseAPIData(result.Data)
+	if err != nil {
+		log.Printf("[IP属地查询] ❌ 解析data字段失败 - IP: %s, 错误: %v", ipStr, err)
+		return "", err
+	}
+
+	log.Printf("[IP属地查询] API响应解析成功 - IP: %s, 业务码: %d, 国家: %s, 省份: %s, 城市: %s",
+		ipStr, result.Code, dataObj.Country, dataObj.Province, dataObj.City)
+
+	province := dataObj.Province
+	city := dataObj.City
 
 	// 根据优先级组装位置信息
 	var finalLocation string
@@ -200,12 +234,12 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr, referer string
 	} else if province != "" {
 		finalLocation = province
 		log.Printf("[IP属地查询] 使用省份格式 - IP: %s, 结果: %s", ipStr, finalLocation)
-	} else if result.Data.Country != "" {
-		finalLocation = result.Data.Country
+	} else if dataObj.Country != "" {
+		finalLocation = dataObj.Country
 		log.Printf("[IP属地查询] 使用国家格式 - IP: %s, 结果: %s", ipStr, finalLocation)
 	} else {
 		log.Printf("[IP属地查询] ❌ API响应中无有效位置信息 - IP: %s, API返回的数据: 国家=%s, 省份=%s, 城市=%s",
-			ipStr, result.Data.Country, result.Data.Province, result.Data.City)
+			ipStr, dataObj.Country, dataObj.Province, dataObj.City)
 		return "", fmt.Errorf("API 响应中未包含位置信息")
 	}
 
@@ -217,13 +251,15 @@ func (s *smartGeoIPService) lookupViaAPI(apiURL, apiToken, ipStr, referer string
 func (s *smartGeoIPService) LookupFull(ipStr string, referer string) (*GeoIPResult, error) {
 	log.Printf("[IP属地查询-完整] 开始查询IP地址: %s, Referer: %s", ipStr, referer)
 
-	apiURL := s.settingSvc.Get(constant.KeyIPAPI.String())
-	apiToken := s.settingSvc.Get(constant.KeyIPAPIToKen.String())
+	apiURL := strings.TrimSpace(s.settingSvc.Get(constant.KeyIPAPI.String()))
+	apiToken := strings.TrimSpace(s.settingSvc.Get(constant.KeyIPAPIToKen.String()))
 
 	if apiURL == "" || apiToken == "" {
-		log.Printf("[IP属地查询-完整] ❌ 远程API未配置")
+		log.Printf("[IP属地查询-完整] ❌ 远程API未配置 (apiURL: %s, apiToken长度: %d)", apiURL, len(apiToken))
 		return nil, fmt.Errorf("IP 查询失败：远程 API 未配置")
 	}
+
+	log.Printf("[IP属地查询-完整] API配置 - URL: %s, Token长度: %d, Token前4位: %s***", apiURL, len(apiToken), apiToken[:min(4, len(apiToken))])
 
 	// 构建请求URL
 	reqURL := fmt.Sprintf("%s?ip=%s", apiURL, ipStr)
@@ -253,24 +289,49 @@ func (s *smartGeoIPService) LookupFull(ipStr string, referer string) (*GeoIPResu
 		return nil, fmt.Errorf("读取响应体失败: %w", err)
 	}
 
+	log.Printf("[IP属地查询-完整] API原始返回内容 - IP: %s, 响应体: %s", ipStr, string(body))
+
+	// 解析 API 响应
 	var result apiResponse
 	if err := json.Unmarshal(body, &result); err != nil {
+		log.Printf("[IP属地查询-完整] ❌ 解析API响应JSON失败 - IP: %s, 错误: %v, 响应体: %s", ipStr, err, string(body))
 		return nil, fmt.Errorf("解析API响应JSON失败: %w", err)
 	}
 
+	// 检查是否是错误响应（code 为负数表示错误）
+	if result.Code < 0 {
+		errMsg := result.Msg
+		if errMsg == "" {
+			errMsg = result.Message
+		}
+		log.Printf("[IP属地查询-完整] ❌ API返回错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, result.Code, errMsg)
+		return nil, fmt.Errorf("API错误: %s", errMsg)
+	}
+
 	if result.Code != 200 {
+		log.Printf("[IP属地查询-完整] ❌ API返回业务错误 - IP: %s, 错误码: %d, 错误信息: %s", ipStr, result.Code, result.Message)
 		return nil, fmt.Errorf("API 返回业务错误码: %d, 信息: %s", result.Code, result.Message)
 	}
 
+	// 解析 data 字段
+	dataObj, err := parseAPIData(result.Data)
+	if err != nil {
+		log.Printf("[IP属地查询-完整] ❌ 解析data字段失败 - IP: %s, 错误: %v", ipStr, err)
+		return nil, err
+	}
+
+	log.Printf("[IP属地查询-完整] ✅ 查询成功 - IP: %s, 国家: %s, 省份: %s, 城市: %s",
+		ipStr, dataObj.Country, dataObj.Province, dataObj.City)
+
 	return &GeoIPResult{
-		IP:        result.Data.IP,
-		Country:   result.Data.Country,
-		Province:  result.Data.Province,
-		City:      result.Data.City,
-		ISP:       result.Data.ISP,
-		Latitude:  result.Data.Latitude,
-		Longitude: result.Data.Longitude,
-		Address:   result.Data.Address,
+		IP:        dataObj.IP,
+		Country:   dataObj.Country,
+		Province:  dataObj.Province,
+		City:      dataObj.City,
+		ISP:       dataObj.ISP,
+		Latitude:  dataObj.Latitude,
+		Longitude: dataObj.Longitude,
+		Address:   dataObj.Address,
 	}, nil
 }
 

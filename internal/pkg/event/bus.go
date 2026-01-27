@@ -17,10 +17,24 @@ type Topic string
 
 const (
 	FileCreated Topic = "file:created"
+
 	// 友链事件
 	LinkCreated Topic = "link:created"
 	LinkUpdated Topic = "link:updated"
 	LinkDeleted Topic = "link:deleted"
+
+	// 文章事件（用于缓存清理）
+	ArticleCreated   Topic = "article:created"
+	ArticleUpdated   Topic = "article:updated"
+	ArticleDeleted   Topic = "article:deleted"
+	ArticlePublished Topic = "article:published"
+
+	// 配置事件
+	SiteConfigUpdated Topic = "site-config:updated"
+
+	// 分类/标签事件
+	CategoryUpdated Topic = "category:updated"
+	TagUpdated      Topic = "tag:updated"
 )
 
 // 事件处理器函数类型

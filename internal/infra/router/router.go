@@ -2,13 +2,15 @@
  * @Description:
  * @Author: 安知鱼
  * @Date: 2025-06-15 11:30:55
- * @LastEditTime: 2026-01-17 18:26:37
+ * @LastEditTime: 2026-01-26 17:47:40
  * @LastEditors: 安知鱼
  */
 // anheyu-app/pkg/router/router.go
 package router
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/anzhiyu-c/anheyu-app/internal/app/middleware"
@@ -34,6 +36,7 @@ import (
 	search_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/search"
 	setting_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/setting"
 	sitemap_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/sitemap"
+	ssrtheme_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/ssrtheme"
 	statistics_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/statistics"
 	storage_policy_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/storage_policy"
 	subscriber_handler "github.com/anzhiyu-c/anheyu-app/pkg/handler/subscriber"
@@ -82,6 +85,7 @@ type Router struct {
 	pageHandler               *page_handler.Handler
 	statisticsHandler         *statistics_handler.StatisticsHandler
 	themeHandler              *theme_handler.Handler
+	ssrThemeHandler           *ssrtheme_handler.Handler
 	mw                        *middleware.Middleware
 	searchHandler             *search_handler.Handler
 	proxyHandler              *proxy_handler.ProxyHandler
@@ -117,6 +121,7 @@ func NewRouter(
 	pageHandler *page_handler.Handler,
 	statisticsHandler *statistics_handler.StatisticsHandler,
 	themeHandler *theme_handler.Handler,
+	ssrThemeHandler *ssrtheme_handler.Handler,
 	mw *middleware.Middleware,
 	searchHandler *search_handler.Handler,
 	proxyHandler *proxy_handler.ProxyHandler,
@@ -150,6 +155,7 @@ func NewRouter(
 		pageHandler:               pageHandler,
 		statisticsHandler:         statisticsHandler,
 		themeHandler:              themeHandler,
+		ssrThemeHandler:           ssrThemeHandler,
 		mw:                        mw,
 		searchHandler:             searchHandler,
 		proxyHandler:              proxyHandler,
@@ -211,7 +217,8 @@ func (r *Router) Setup(engine *gin.Engine) {
 	r.registerVersionRoutes(apiGroup)
 	r.registerNotificationRoutes(apiGroup)
 	r.registerConfigBackupRoutes(apiGroup)
-	r.registerSitemapRoutes(engine) // 直接注册到engine，不使用/api前缀
+	r.registerSitemapRoutes(engine)    // 直接注册到engine，不使用/api前缀
+	r.registerSSRThemeRoutes(apiGroup) // 注册 SSR 主题管理路由
 }
 
 func (r *Router) registerCommentRoutes(api *gin.RouterGroup) {
@@ -702,6 +709,9 @@ func (r *Router) registerThemeRoutes(api *gin.RouterGroup) {
 
 		// 检查静态模式状态: GET /api/public/theme/static-mode
 		themePublic.GET("/static-mode", r.themeHandler.CheckStaticMode)
+
+		// 获取当前主题配置（公开接口，供前端主题使用）: GET /api/public/theme/config
+		themePublic.GET("/config", r.themeHandler.GetPublicThemeConfig)
 	}
 
 	// 需要登录的主题管理接口
@@ -730,6 +740,20 @@ func (r *Router) registerThemeRoutes(api *gin.RouterGroup) {
 
 		// 卸载主题: POST /api/theme/uninstall
 		themeAuth.POST("/uninstall", r.themeHandler.UninstallTheme)
+
+		// ===== 主题配置相关 =====
+
+		// 获取主题配置定义: GET /api/theme/settings?theme_name=xxx
+		themeAuth.GET("/settings", r.themeHandler.GetThemeSettings)
+
+		// 获取用户主题配置: GET /api/theme/config?theme_name=xxx
+		themeAuth.GET("/config", r.themeHandler.GetUserThemeConfig)
+
+		// 保存用户主题配置: POST /api/theme/config
+		themeAuth.POST("/config", r.themeHandler.SaveUserThemeConfig)
+
+		// 获取当前主题的完整配置（定义+值）: GET /api/theme/current-config
+		themeAuth.GET("/current-config", r.themeHandler.GetCurrentThemeConfig)
 	}
 }
 
@@ -826,5 +850,37 @@ func (r *Router) registerConfigBackupRoutes(api *gin.RouterGroup) {
 
 		// 导入配置
 		configGroup.POST("/import", r.configImportExportHandler.ImportConfig)
+	}
+}
+
+// registerSSRThemeRoutes 注册 SSR 主题管理相关路由
+func (r *Router) registerSSRThemeRoutes(api *gin.RouterGroup) {
+	// 如果 SSR 主题处理器未初始化，跳过注册
+	if r.ssrThemeHandler == nil {
+		log.Println("⚠️ SSR 主题处理器未初始化，跳过路由注册")
+		return
+	}
+	log.Println("📍 正在注册 SSR 主题管理路由...")
+
+	// SSR 主题管理路由 - 需要管理员权限
+	ssrThemeAdmin := api.Group("/admin/ssr-theme").Use(NoCacheMiddleware()).Use(r.mw.JWTAuth(), r.mw.AdminAuth())
+	{
+		// 安装 SSR 主题: POST /api/admin/ssr-theme/install
+		ssrThemeAdmin.POST("/install", r.ssrThemeHandler.InstallTheme)
+
+		// 列出已安装的 SSR 主题: GET /api/admin/ssr-theme/list
+		ssrThemeAdmin.GET("/list", r.ssrThemeHandler.ListInstalledThemes)
+
+		// 卸载 SSR 主题: DELETE /api/admin/ssr-theme/:name
+		ssrThemeAdmin.DELETE("/:name", r.ssrThemeHandler.UninstallTheme)
+
+		// 启动 SSR 主题: POST /api/admin/ssr-theme/:name/start
+		ssrThemeAdmin.POST("/:name/start", r.ssrThemeHandler.StartTheme)
+
+		// 停止 SSR 主题: POST /api/admin/ssr-theme/:name/stop
+		ssrThemeAdmin.POST("/:name/stop", r.ssrThemeHandler.StopTheme)
+
+		// 获取 SSR 主题状态: GET /api/admin/ssr-theme/:name/status
+		ssrThemeAdmin.GET("/:name/status", r.ssrThemeHandler.GetThemeStatus)
 	}
 }

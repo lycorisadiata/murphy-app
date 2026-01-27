@@ -1,6 +1,8 @@
 package router
 
 import (
+	"bytes"
+	"context"
 	"crypto/md5"
 	"embed"
 	"encoding/json"
@@ -9,6 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,6 +22,7 @@ import (
 	"github.com/anzhiyu-c/anheyu-app/internal/pkg/strutil"
 	"github.com/anzhiyu-c/anheyu-app/pkg/config"
 	"github.com/anzhiyu-c/anheyu-app/pkg/constant"
+	"github.com/anzhiyu-c/anheyu-app/pkg/domain/repository"
 	"github.com/anzhiyu-c/anheyu-app/pkg/handler/rss"
 	"github.com/anzhiyu-c/anheyu-app/pkg/response"
 	article_service "github.com/anzhiyu-c/anheyu-app/pkg/service/article"
@@ -38,6 +42,260 @@ func (r CustomHTMLRender) Instance(name string, data interface{}) render.Render 
 
 // 全局 Debug 标志
 var isDebugMode bool
+
+// API-only 模式标志
+// 当 ANHEYU_MODE=api 时，仅提供 API 和后台管理，前台由外部 SSR 服务处理
+var isAPIOnlyMode bool
+
+// 全局 PageRepository 引用，用于获取自定义页面的 SEO 数据
+var globalPageRepo repository.PageRepository
+
+// PageSEOData 存储页面 SEO 信息
+type PageSEOData struct {
+	Title       string // 页面标题
+	Description string // 页面描述
+	Keywords    string // 页面关键词（可选）
+	OgType      string // Open Graph 类型
+}
+
+// 内置页面的 SEO 配置映射
+// key: 路由路径, value: SEO 配置
+var builtInPageSEO = map[string]PageSEOData{
+	"/archives": {
+		Title:       "全部文章",
+		Description: "浏览所有文章，按时间线查看博客的全部内容",
+		OgType:      "website",
+	},
+	"/categories": {
+		Title:       "分类列表",
+		Description: "按分类浏览文章，快速找到感兴趣的内容",
+		OgType:      "website",
+	},
+	"/tags": {
+		Title:       "标签列表",
+		Description: "按标签浏览文章，发现相关主题的内容",
+		OgType:      "website",
+	},
+	"/link": {
+		Title:       "友情链接",
+		Description: "友情链接，与优秀的博主们互相交流",
+		OgType:      "website",
+	},
+	"/travelling": {
+		Title:       "宝藏博主",
+		Description: "发现优秀的博主，探索更多精彩内容",
+		OgType:      "website",
+	},
+	"/fcircle": {
+		Title:       "朋友动态",
+		Description: "朋友们的最新动态，了解他们的近况",
+		OgType:      "website",
+	},
+	"/music": {
+		Title:       "音乐馆",
+		Description: "聆听美妙的音乐，享受片刻的宁静",
+		OgType:      "website",
+	},
+	"/air-conditioner": {
+		Title:       "小空调",
+		Description: "夏日消暑神器，给你一丝清凉",
+		OgType:      "website",
+	},
+	"/album": {
+		Title:       "相册集",
+		Description: "精选照片集，记录生活中的美好瞬间",
+		OgType:      "website",
+	},
+	"/essay": {
+		Title:       "即刻",
+		Description: "随笔记录，分享日常的点滴感悟",
+		OgType:      "website",
+	},
+	"/about": {
+		Title:       "关于本站",
+		Description: "了解本站和站长的更多信息",
+		OgType:      "website",
+	},
+	"/equipment": {
+		Title:       "我的装备",
+		Description: "分享我使用的设备和工具",
+		OgType:      "website",
+	},
+	// 新增页面类型
+	"/random-post": {
+		Title:       "随机文章",
+		Description: "随机推荐一篇文章，发现意想不到的精彩内容",
+		OgType:      "website",
+	},
+	"/article-statistics": {
+		Title:       "文章统计",
+		Description: "博客文章的数据统计和分析",
+		OgType:      "website",
+	},
+	"/update": {
+		Title:       "更新日志",
+		Description: "博客的更新记录和版本历史",
+		OgType:      "website",
+	},
+	"/user-center": {
+		Title:       "用户中心",
+		Description: "管理您的个人信息和账号设置",
+		OgType:      "website",
+	},
+	"/recentcomments": {
+		Title:       "最近评论",
+		Description: "查看博客的最新评论互动",
+		OgType:      "website",
+	},
+}
+
+// getPageSEOData 根据路径获取页面的 SEO 数据
+// 优先级：1. 自定义页面（从数据库） 2. 内置页面配置 3. 导航菜单配置 4. 默认配置
+func getPageSEOData(ctx context.Context, path string, settingSvc setting.SettingService) *PageSEOData {
+	siteName := settingSvc.Get(constant.KeyAppName.String())
+	siteDescription := settingSvc.Get(constant.KeySiteDescription.String())
+
+	// 1. 检查是否是归档页面 /archives/2025/ 或 /archives/2025/01/
+	archiveYearPattern := regexp.MustCompile(`^/archives/(\d{4})/?$`)
+	archiveMonthPattern := regexp.MustCompile(`^/archives/(\d{4})/(\d{1,2})/?$`)
+
+	if matches := archiveMonthPattern.FindStringSubmatch(path); len(matches) == 3 {
+		year, month := matches[1], matches[2]
+		return &PageSEOData{
+			Title:       fmt.Sprintf("%s年%s月归档", year, month),
+			Description: fmt.Sprintf("浏览 %s 年 %s 月发布的所有文章", year, month),
+			OgType:      "website",
+		}
+	}
+	if matches := archiveYearPattern.FindStringSubmatch(path); len(matches) == 2 {
+		year := matches[1]
+		return &PageSEOData{
+			Title:       fmt.Sprintf("%s年归档", year),
+			Description: fmt.Sprintf("浏览 %s 年发布的所有文章", year),
+			OgType:      "website",
+		}
+	}
+
+	// 2. 检查是否是分类详情页 /categories/{slug}
+	if strings.HasPrefix(path, "/categories/") && !strings.Contains(path, "/page/") {
+		slug := strings.TrimPrefix(path, "/categories/")
+		slug = strings.TrimSuffix(slug, "/")
+		// URL 解码处理中文等特殊字符
+		decodedSlug, err := decodeURLPath(slug)
+		if err != nil {
+			decodedSlug = slug
+		}
+		return &PageSEOData{
+			Title:       fmt.Sprintf("分类: %s", decodedSlug),
+			Description: fmt.Sprintf("浏览「%s」分类下的所有文章", decodedSlug),
+			OgType:      "website",
+		}
+	}
+
+	// 3. 检查是否是标签详情页 /tags/{slug}
+	if strings.HasPrefix(path, "/tags/") && !strings.Contains(path, "/page/") {
+		slug := strings.TrimPrefix(path, "/tags/")
+		slug = strings.TrimSuffix(slug, "/")
+		// URL 解码处理中文等特殊字符
+		decodedSlug, err := decodeURLPath(slug)
+		if err != nil {
+			decodedSlug = slug
+		}
+		return &PageSEOData{
+			Title:       fmt.Sprintf("标签: %s", decodedSlug),
+			Description: fmt.Sprintf("浏览带有「%s」标签的所有文章", decodedSlug),
+			OgType:      "website",
+		}
+	}
+
+	// 4. 检查内置页面配置
+	if seoData, exists := builtInPageSEO[path]; exists {
+		// 尝试从导航菜单获取自定义标题
+		menuTitle := getMenuTitleByPath(path, settingSvc)
+		if menuTitle != "" {
+			seoData.Title = menuTitle
+		}
+		return &seoData
+	}
+
+	// 5. 尝试从自定义页面表获取
+	if globalPageRepo != nil {
+		// 尝试原始路径
+		pageData, err := globalPageRepo.GetByPath(ctx, path)
+		// 如果没找到且路径有末尾斜杠，尝试去掉末尾斜杠
+		if err != nil && strings.HasSuffix(path, "/") && len(path) > 1 {
+			pageData, err = globalPageRepo.GetByPath(ctx, strings.TrimSuffix(path, "/"))
+		}
+		// 如果没找到且路径没有末尾斜杠，尝试加上末尾斜杠
+		if err != nil && !strings.HasSuffix(path, "/") {
+			pageData, err = globalPageRepo.GetByPath(ctx, path+"/")
+		}
+
+		if err == nil && pageData != nil && pageData.IsPublished {
+			description := pageData.Description
+			if description == "" {
+				// 从内容中截取描述
+				plainText := parser.StripHTML(pageData.Content)
+				plainText = strings.Join(strings.Fields(plainText), " ")
+				description = strutil.Truncate(plainText, 150)
+			}
+			if description == "" {
+				description = siteDescription
+			}
+			return &PageSEOData{
+				Title:       pageData.Title,
+				Description: description,
+				OgType:      "article",
+			}
+		}
+	}
+
+	// 6. 尝试从导航菜单获取标题
+	menuTitle := getMenuTitleByPath(path, settingSvc)
+	if menuTitle != "" {
+		return &PageSEOData{
+			Title:       menuTitle,
+			Description: fmt.Sprintf("%s - %s", menuTitle, siteName),
+			OgType:      "website",
+		}
+	}
+
+	// 7. 返回 nil，使用默认 SEO 数据
+	return nil
+}
+
+// getMenuTitleByPath 从导航菜单配置中获取指定路径的标题
+func getMenuTitleByPath(path string, settingSvc setting.SettingService) string {
+	menuJSON := settingSvc.Get(constant.KeyHeaderMenu.String())
+	var menuGroups []MenuItem
+	if err := json.Unmarshal([]byte(menuJSON), &menuGroups); err != nil {
+		return ""
+	}
+
+	for _, group := range menuGroups {
+		for _, item := range group.Items {
+			if item.Path == path && !item.IsExternal {
+				return item.Title
+			}
+		}
+	}
+	return ""
+}
+
+// decodeURLPath 解码 URL 路径中的特殊字符
+// 处理中文、空格等 URL 编码的字符
+func decodeURLPath(encoded string) (string, error) {
+	decoded, err := url.PathUnescape(encoded)
+	if err != nil {
+		return encoded, err
+	}
+	return decoded, nil
+}
+
+// IsAPIOnlyMode 检查是否启用 API-only 模式
+func IsAPIOnlyMode() bool {
+	return os.Getenv("ANHEYU_MODE") == "api"
+}
 
 // debugLog 根据 Debug 配置条件性地打印日志
 func debugLog(format string, v ...interface{}) {
@@ -169,6 +427,23 @@ func getRequestScheme(c *gin.Context) string {
 		return "https"
 	}
 	return "http"
+}
+
+// getCanonicalURL 获取用于 SEO 的规范 URL
+// 优先使用系统配置的 SITE_URL，确保 og:url、canonical 等标签使用正确的域名
+// 而不是从请求中获取的可能是内部地址（如 127.0.0.1）的 Host
+func getCanonicalURL(c *gin.Context, settingSvc setting.SettingService) string {
+	// 优先使用系统配置的 SITE_URL
+	siteURL := settingSvc.Get(constant.KeySiteURL.String())
+	if siteURL != "" {
+		// 移除末尾斜杠，避免重复
+		siteURL = strings.TrimSuffix(siteURL, "/")
+		// 拼接请求路径
+		return siteURL + c.Request.URL.RequestURI()
+	}
+
+	// 回退：从请求中构建 URL（可能不准确，但保持向后兼容）
+	return fmt.Sprintf("%s://%s%s", getRequestScheme(c), c.Request.Host, c.Request.URL.RequestURI())
 }
 
 // generateFileETag 为文件生成基于内容的ETag
@@ -410,6 +685,42 @@ func tryServeStaticFile(c *gin.Context, filePath string, staticMode bool, distFS
 	return false
 }
 
+// serveEmbeddedAssets 从内嵌文件系统提供 assets 资源
+// 用于后台 Vue 前端的 JS/CSS 资源加载
+func serveEmbeddedAssets(c *gin.Context, filePath string, distFS fs.FS) {
+	// 首先尝试提供压缩文件
+	if compressed, compressedPath, modTime, size := tryServeCompressedFile(c, "assets/"+filePath, false, distFS); compressed {
+		etag := generateFileETag(compressedPath, modTime, size)
+		if handleStaticFileConditionalRequest(c, etag, "assets/"+filePath) {
+			return
+		}
+		c.Header("ETag", etag)
+		c.Header("Cache-Control", "public, max-age=31536000, must-revalidate")
+		c.Header("Vary", "Accept-Encoding")
+		http.ServeFileFS(c.Writer, c.Request, distFS, compressedPath)
+		return
+	}
+
+	// 提供原始文件
+	assetsFilePath := "assets/" + filePath
+	if file, err := distFS.Open(assetsFilePath); err == nil {
+		defer file.Close()
+		if stat, err := file.Stat(); err == nil && !stat.IsDir() {
+			etag := generateFileETag(filePath, stat.ModTime(), stat.Size())
+			if handleStaticFileConditionalRequest(c, etag, filePath) {
+				return
+			}
+			c.Header("ETag", etag)
+			c.Header("Cache-Control", "public, max-age=31536000, must-revalidate")
+			c.Header("Vary", "Accept-Encoding")
+			c.Header("Content-Type", getContentType(filePath))
+			http.ServeFileFS(c.Writer, c.Request, distFS, assetsFilePath)
+			return
+		}
+	}
+	c.Status(http.StatusNotFound)
+}
+
 // isStaticFileRequest 判断是否是静态文件请求（基于文件扩展名）
 func isStaticFileRequest(filePath string) bool {
 	staticExtensions := []string{
@@ -464,6 +775,33 @@ func shouldReturnIndexHTML(path string) bool {
 	return true
 }
 
+// isAdminPath 判断是否是后台管理路径
+// 后台路径始终使用官方内嵌资源，不受外部主题影响
+func isAdminPath(path string) bool {
+	adminPrefixes := []string{
+		"/admin", // 后台管理页面
+		"/login", // 登录页面（后台入口）
+	}
+
+	for _, prefix := range adminPrefixes {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// shouldUseExternalTheme 判断当前路径是否应该使用外部主题
+// 只有前台页面且 static 目录存在时才使用外部主题
+func shouldUseExternalTheme(path string) bool {
+	// 后台路径始终使用官方内嵌资源
+	if isAdminPath(path) {
+		return false
+	}
+	// 前台路径：检查是否有外部主题
+	return isStaticModeActive()
+}
+
 // isStaticModeActive 检查是否使用静态模式（与主题服务保持一致）
 func isStaticModeActive() bool {
 	staticDirName := "static"
@@ -515,22 +853,36 @@ func isStaticModeActive() bool {
 }
 
 // SetupFrontend 封装了所有与前端静态资源和模板相关的配置（动态模式）
-func SetupFrontend(engine *gin.Engine, settingSvc setting.SettingService, articleSvc article_service.Service, cacheSvc utility.CacheService, embeddedFS embed.FS, cfg *config.Config) {
+func SetupFrontend(engine *gin.Engine, settingSvc setting.SettingService, articleSvc article_service.Service, cacheSvc utility.CacheService, embeddedFS embed.FS, cfg *config.Config, pageRepo repository.PageRepository) {
+	// 保存 pageRepo 到全局变量，用于 SEO 数据获取
+	globalPageRepo = pageRepo
+
 	// 从配置中读取 Debug 模式
 	isDebugMode = cfg.GetBool(config.KeyServerDebug)
 
+	// 检查 API-only 模式
+	isAPIOnlyMode = IsAPIOnlyMode()
+
 	// 启动时打印主题模式信息
-	if isStaticModeActive() {
-		log.Println("========================================")
-		log.Println("🎨 前端主题模式: 外部主题模式 (static 目录)")
-		log.Println("   说明: 检测到 static/index.html，将从 static 目录加载前端资源")
-		log.Println("========================================")
+	log.Println("========================================")
+	if isAPIOnlyMode {
+		log.Println("🔌 API-only 模式已启用")
+		log.Println("   前台展示: 由外部 SSR 服务处理 (如 Next.js)")
+		log.Println("   后台管理 (/admin/*, /login): 使用官方内嵌资源")
+		log.Println("   API 接口 (/api/*): 正常提供")
+		log.Println("   说明: 前台 HTML 路由已禁用，需配置 Nginx 反向代理")
 	} else {
-		log.Println("========================================")
-		log.Println("🎨 前端主题模式: 内嵌主题模式 (embed)")
-		log.Println("   说明: 未检测到 static/index.html，将使用内嵌的前端资源")
-		log.Println("========================================")
+		log.Println("🎨 前后台分离主题系统已启用")
+		log.Println("   后台管理 (/admin/*, /login): 始终使用官方内嵌资源")
+		if isStaticModeActive() {
+			log.Println("   前台展示 (其他路径): 外部主题模式 (static 目录)")
+			log.Println("   说明: 检测到 static/index.html，前台将从 static 目录加载")
+		} else {
+			log.Println("   前台展示 (其他路径): 官方主题模式 (embed)")
+			log.Println("   说明: 未检测到 static/index.html，前台将使用内嵌资源")
+		}
 	}
+	log.Println("========================================")
 
 	debugLog("正在配置动态前端路由系统...")
 
@@ -561,7 +913,96 @@ func SetupFrontend(engine *gin.Engine, settingSvc setting.SettingService, articl
 		log.Fatalf("解析嵌入式HTML模板失败: %v", err)
 	}
 
-	// 动态静态文件路由 - 每次请求都检查静态模式（支持压缩）
+	// 后台专用静态文件路由 - 始终从 embed 读取，不受外部主题影响
+	// 这是前后台分离的关键：后台的 JS/CSS 使用 /admin-static/ 路径
+	engine.GET("/admin-static/*filepath", func(c *gin.Context) {
+		filePath := strings.TrimPrefix(c.Param("filepath"), "/")
+		debugLog("后台静态资源请求: %s (始终使用内嵌资源)", filePath)
+
+		// 首先尝试提供压缩文件
+		if compressed, compressedPath, modTime, size := tryServeCompressedFile(c, "static/"+filePath, false, distFS); compressed {
+			etag := generateFileETag(compressedPath, modTime, size)
+			if handleStaticFileConditionalRequest(c, etag, "static/"+filePath) {
+				return
+			}
+			c.Header("ETag", etag)
+			if isHTMLFile(filePath) {
+				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+				c.Header("Pragma", "no-cache")
+				c.Header("Expires", "0")
+			} else {
+				c.Header("Cache-Control", "public, max-age=31536000, must-revalidate")
+			}
+			c.Header("Vary", "Accept-Encoding")
+			http.ServeFileFS(c.Writer, c.Request, distFS, compressedPath)
+			return
+		}
+
+		// 提供原始文件
+		staticFilePath := "static/" + filePath
+		if file, err := distFS.Open(staticFilePath); err == nil {
+			defer file.Close()
+			if stat, err := file.Stat(); err == nil && !stat.IsDir() {
+				etag := generateFileETag(filePath, stat.ModTime(), stat.Size())
+				if handleStaticFileConditionalRequest(c, etag, filePath) {
+					return
+				}
+				c.Header("ETag", etag)
+				if isHTMLFile(filePath) {
+					c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+					c.Header("Pragma", "no-cache")
+					c.Header("Expires", "0")
+				} else {
+					c.Header("Cache-Control", "public, max-age=31536000, must-revalidate")
+				}
+				c.Header("Vary", "Accept-Encoding")
+				c.Header("Content-Type", getContentType(filePath))
+				http.ServeFileFS(c.Writer, c.Request, distFS, staticFilePath)
+				return
+			}
+		}
+		c.Status(http.StatusNotFound)
+	})
+
+	// 后台专用 assets 路由（别名）- 处理 Vue 前端的 JS/CSS 资源
+	// 当外部主题存在时，后台 HTML 中的资源路径会被重写为 /admin-assets/
+	// 这个路由始终从内嵌资源加载，确保后台不受外部主题影响
+	engine.GET("/admin-assets/*filepath", func(c *gin.Context) {
+		filePath := strings.TrimPrefix(c.Param("filepath"), "/")
+		debugLog("后台 admin-assets 资源请求: %s (始终使用内嵌资源)", filePath)
+		serveEmbeddedAssets(c, filePath, distFS)
+	})
+
+	// 动态 assets 路由 - 优先使用外部主题资源，回退到内嵌资源
+	// 这样可以兼容任何类型的外部主题（不限于 Next.js）
+	engine.GET("/assets/*filepath", func(c *gin.Context) {
+		filePath := strings.TrimPrefix(c.Param("filepath"), "/")
+
+		// 如果外部主题模式激活，先检查外部主题是否有此资源
+		if isStaticModeActive() {
+			externalPath := filepath.Join("static", "assets", filePath)
+			if fileInfo, err := os.Stat(externalPath); err == nil && !fileInfo.IsDir() {
+				// 外部主题有此资源，从外部加载
+				debugLog("assets 资源请求: %s (使用外部主题资源)", filePath)
+				etag := generateFileETag(filePath, fileInfo.ModTime(), fileInfo.Size())
+				if handleStaticFileConditionalRequest(c, etag, filePath) {
+					return
+				}
+				c.Header("ETag", etag)
+				c.Header("Cache-Control", "public, max-age=31536000, must-revalidate")
+				c.Header("Vary", "Accept-Encoding")
+				c.Header("Content-Type", getContentType(filePath))
+				c.File(externalPath)
+				return
+			}
+		}
+
+		// 外部主题没有此资源或不在外部主题模式，从内嵌资源加载
+		debugLog("assets 资源请求: %s (使用内嵌资源)", filePath)
+		serveEmbeddedAssets(c, filePath, distFS)
+	})
+
+	// 动态静态文件路由 - 前台静态资源，根据外部主题是否存在决定来源
 	engine.GET("/static/*filepath", func(c *gin.Context) {
 		filePath := strings.TrimPrefix(c.Param("filepath"), "/")
 		staticMode := isStaticModeActive()
@@ -683,16 +1124,73 @@ func SetupFrontend(engine *gin.Engine, settingSvc setting.SettingService, articl
 			return
 		}
 
+		// 🆕 API-only 模式：仅处理后台路由，前台请求返回 404
+		// 前台由外部 SSR 服务（如 Next.js）处理，通过 Nginx 反向代理
+		if isAPIOnlyMode {
+			// 后台路由继续处理
+			if isAdminPath(path) {
+				debugLog("API-only 模式：处理后台路由 %s", path)
+				// 判断是否应该返回 index.html 让前端路由处理
+				if shouldReturnIndexHTML(path) {
+					debugLog("SPA路由请求: %s，返回index.html让前端处理", path)
+					// 后台始终使用内嵌模板
+					renderHTMLPageWithAdminRewrite(c, settingSvc, articleSvc, embeddedTemplates)
+					return
+				}
+			}
+
+			// 尝试提供后台静态文件（favicon.ico 等）
+			filePath := strings.TrimPrefix(path, "/")
+			if filePath != "" && isAdminPath(path) && tryServeStaticFile(c, filePath, false, distFS) {
+				return
+			}
+
+			// 前台请求在 API-only 模式下返回 404
+			// 说明：此请求应该由 Nginx 转发到 Next.js SSR 服务
+			if !isAdminPath(path) {
+				debugLog("API-only 模式：前台请求 %s 应由 SSR 服务处理", path)
+				response.Fail(c, http.StatusNotFound, "此路由由外部 SSR 服务处理")
+				return
+			}
+
+			// 其他未知请求，返回404
+			debugLog("未知请求: %s", path)
+			response.Fail(c, http.StatusNotFound, "页面未找到")
+			return
+		}
+
+		// 🆕 多页面模式支持：优先检查是否存在对应的 HTML 文件
+		// 这样可以为每个页面提供独立的 HTML，优化 SEO
+		// 支持两种主题类型：
+		//   1. Go 模板主题：HTML 中包含 {{ }} 变量，由 serveStaticHTMLFile 解析
+		//   2. 纯静态主题（如 Next.js）：直接返回 HTML，不做模板解析
+		if shouldUseExternalTheme(path) && !isAdminPath(path) {
+			htmlFilePath := getPageHTMLPath(path)
+			if htmlFilePath != "" {
+				fullPath := filepath.Join("static", htmlFilePath)
+				if _, err := os.Stat(fullPath); err == nil {
+					debugLog("多页面模式：返回独立HTML文件 %s，路径: %s", htmlFilePath, path)
+					// 所有外部主题的 HTML 文件都通过 serveStaticHTMLFile 处理
+					// 该函数会自动判断是 Go 模板还是纯静态 HTML
+					serveStaticHTMLFile(c, fullPath, settingSvc, articleSvc, funcMap)
+					return
+				}
+			}
+		}
+
 		// 判断是否应该返回 index.html 让前端路由处理
 		if shouldReturnIndexHTML(path) {
 			debugLog("SPA路由请求: %s，返回index.html让前端处理", path)
 
-			// 渲染HTML页面
-			staticMode := isStaticModeActive()
+			// 核心改进：根据路径决定使用哪个模板
+			// - 后台路径（/admin/*, /login）：始终使用官方内嵌模板，且静态资源路径重写
+			// - 前台路径：根据 static 目录是否存在决定
+			isAdmin := isAdminPath(path)
+			useExternalTheme := shouldUseExternalTheme(path)
 			var templateInstance *template.Template
 
-			if staticMode {
-				debugLog("动态路由：当前使用外部主题模式，路径: %s", path)
+			if useExternalTheme {
+				debugLog("动态路由：前台页面使用外部主题模式，路径: %s", path)
 				// 每次都重新解析外部模板，确保获取最新内容
 				overrideDir := "static"
 				parsedTemplates, err := template.New("index.html").Funcs(funcMap).ParseFiles(filepath.Join(overrideDir, "index.html"))
@@ -703,18 +1201,29 @@ func SetupFrontend(engine *gin.Engine, settingSvc setting.SettingService, articl
 					templateInstance = parsedTemplates
 				}
 			} else {
-				debugLog("动态路由：当前使用内嵌主题模式，路径: %s", path)
+				if isAdmin {
+					debugLog("动态路由：后台页面始终使用内嵌模板，路径: %s", path)
+				} else {
+					debugLog("动态路由：前台页面使用内嵌主题模式，路径: %s", path)
+				}
 				templateInstance = embeddedTemplates
 			}
 
 			// 渲染HTML页面
-			renderHTMLPage(c, settingSvc, articleSvc, templateInstance)
+			// 如果是后台页面且存在外部主题，需要重写静态资源路径
+			if isAdmin && isStaticModeActive() {
+				renderHTMLPageWithAdminRewrite(c, settingSvc, articleSvc, templateInstance)
+			} else {
+				renderHTMLPage(c, settingSvc, articleSvc, templateInstance)
+			}
 			return
 		}
 
 		// 尝试提供静态文件（处理根目录下的静态文件，如 favicon.ico, robots.txt 等）
 		filePath := strings.TrimPrefix(path, "/")
-		if filePath != "" && tryServeStaticFile(c, filePath, isStaticModeActive(), distFS) {
+		// 静态文件也需要区分前后台：后台的静态文件始终从 embed 读取
+		useExternalForStatic := !isAdminPath(path) && isStaticModeActive()
+		if filePath != "" && tryServeStaticFile(c, filePath, useExternalForStatic, distFS) {
 			return
 		}
 
@@ -1004,6 +1513,90 @@ func generateSocialMediaLinks(settingSvc setting.SettingService) []string {
 	return allLinks
 }
 
+// rewriteStaticPathsForAdmin 为后台页面重写静态资源路径
+// 将 /static/ 和 /assets/ 替换为 /admin-static/ 和 /admin-assets/，确保后台资源始终从官方 embed 加载
+func rewriteStaticPathsForAdmin(html string) string {
+	// 替换 /assets/ 路径（Vue 前端的 JS/CSS 资源）
+	html = strings.ReplaceAll(html, `src="/assets/`, `src="/admin-assets/`)
+	html = strings.ReplaceAll(html, `href="/assets/`, `href="/admin-assets/`)
+
+	// 替换 /static/ 路径（图片等静态资源）
+	html = strings.ReplaceAll(html, `src="/static/`, `src="/admin-static/`)
+	html = strings.ReplaceAll(html, `href="/static/`, `href="/admin-static/`)
+
+	// 替换 CSS 中的 url() 路径
+	html = strings.ReplaceAll(html, `url("/static/`, `url("/admin-static/`)
+	html = strings.ReplaceAll(html, `url('/static/`, `url('/admin-static/`)
+	html = strings.ReplaceAll(html, `url("/assets/`, `url("/admin-assets/`)
+	html = strings.ReplaceAll(html, `url('/assets/`, `url('/admin-assets/`)
+	return html
+}
+
+// renderHTMLPageWithAdminRewrite 为后台页面渲染HTML，并重写静态资源路径
+// 这确保后台页面的JS/CSS始终从官方embed加载，不受外部主题影响
+func renderHTMLPageWithAdminRewrite(c *gin.Context, settingSvc setting.SettingService, articleSvc article_service.Service, templates *template.Template) {
+	// 设置响应头
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate, private, max-age=0")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+	c.Header("Content-Type", "text/html; charset=utf-8")
+
+	// 获取用于 SEO 的规范 URL（优先使用 SITE_URL 配置）
+	fullURL := getCanonicalURL(c, settingSvc)
+
+	// 获取默认页面数据
+	defaultTitle := fmt.Sprintf("%s - %s", settingSvc.Get(constant.KeyAppName.String()), settingSvc.Get(constant.KeySubTitle.String()))
+	defaultDescription := settingSvc.Get(constant.KeySiteDescription.String())
+	defaultImage := settingSvc.Get(constant.KeyLogoURL512.String())
+
+	// 处理自定义HTML
+	customHeaderHTML := ensureScriptTagsClosed(settingSvc.Get(constant.KeyCustomHeaderHTML.String()))
+	customFooterHTML := ensureScriptTagsClosed(settingSvc.Get(constant.KeyCustomFooterHTML.String()))
+
+	// 准备模板数据
+	data := gin.H{
+		"pageTitle":            defaultTitle,
+		"pageDescription":      defaultDescription,
+		"keywords":             settingSvc.Get(constant.KeySiteKeywords.String()),
+		"author":               settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String()),
+		"themeColor":           "#f7f9fe",
+		"favicon":              settingSvc.Get(constant.KeyIconURL.String()),
+		"initialData":          nil,
+		"ogType":               "website",
+		"ogUrl":                fullURL,
+		"ogTitle":              defaultTitle,
+		"ogDescription":        defaultDescription,
+		"ogImage":              defaultImage,
+		"ogSiteName":           settingSvc.Get(constant.KeyAppName.String()),
+		"ogLocale":             "zh_CN",
+		"articlePublishedTime": nil,
+		"articleModifiedTime":  nil,
+		"articleAuthor":        nil,
+		"articleTags":          nil,
+		"breadcrumbList":       nil,
+		"socialMediaLinks":     []string{},
+		"customHeaderHTML":     template.HTML(customHeaderHTML),
+		"customFooterHTML":     template.HTML(customFooterHTML),
+	}
+
+	// 渲染到 buffer
+	var buf bytes.Buffer
+	if err := templates.ExecuteTemplate(&buf, "index.html", data); err != nil {
+		log.Printf("[Admin Render] 渲染模板失败: %v", err)
+		c.String(http.StatusInternalServerError, "渲染页面失败")
+		return
+	}
+
+	// 重写静态资源路径
+	html := rewriteStaticPathsForAdmin(buf.String())
+
+	debugLog("后台页面静态资源路径已重写为 /admin-static/")
+
+	// 写入响应
+	c.Writer.WriteHeader(http.StatusOK)
+	c.Writer.Write([]byte(html))
+}
+
 // renderHTMLPage 渲染HTML页面的通用函数（版本）
 func renderHTMLPage(c *gin.Context, settingSvc setting.SettingService, articleSvc article_service.Service, templates *template.Template) {
 	// 🚫 强制禁用HTML页面的所有缓存
@@ -1011,8 +1604,8 @@ func renderHTMLPage(c *gin.Context, settingSvc setting.SettingService, articleSv
 	c.Header("Pragma", "no-cache")
 	c.Header("Expires", "0")
 
-	// 获取完整的当前页面 URL
-	fullURL := fmt.Sprintf("%s://%s%s", getRequestScheme(c), c.Request.Host, c.Request.URL.RequestURI())
+	// 获取用于 SEO 的规范 URL（优先使用 SITE_URL 配置）
+	fullURL := getCanonicalURL(c, settingSvc)
 
 	isPostDetail, _ := regexp.MatchString(`^/posts/([^/]+)$`, c.Request.URL.Path)
 	if isPostDetail {
@@ -1110,10 +1703,27 @@ func renderHTMLPage(c *gin.Context, settingSvc setting.SettingService, articleSv
 		}
 	}
 
-	// --- 默认页面渲染 ---
-	defaultTitle := fmt.Sprintf("%s - %s", settingSvc.Get(constant.KeyAppName.String()), settingSvc.Get(constant.KeySubTitle.String()))
+	// --- 默认页面渲染（带 SEO 优化） ---
+	siteName := settingSvc.Get(constant.KeyAppName.String())
+	subTitle := settingSvc.Get(constant.KeySubTitle.String())
+	defaultTitle := fmt.Sprintf("%s - %s", siteName, subTitle)
 	defaultDescription := settingSvc.Get(constant.KeySiteDescription.String())
 	defaultImage := settingSvc.Get(constant.KeyLogoURL512.String())
+	ogType := "website"
+
+	// 🆕 尝试获取页面特定的 SEO 数据
+	pageSEO := getPageSEOData(c.Request.Context(), c.Request.URL.Path, settingSvc)
+	if pageSEO != nil {
+		// 使用页面特定的 SEO 数据
+		defaultTitle = fmt.Sprintf("%s - %s", pageSEO.Title, siteName)
+		if pageSEO.Description != "" {
+			defaultDescription = pageSEO.Description
+		}
+		if pageSEO.OgType != "" {
+			ogType = pageSEO.OgType
+		}
+		debugLog("🎯 页面 SEO 优化: path=%s, title=%s", c.Request.URL.Path, defaultTitle)
+	}
 
 	// 处理自定义HTML，确保script标签正确闭合
 	customHeaderHTML := ensureScriptTagsClosed(settingSvc.Get(constant.KeyCustomHeaderHTML.String()))
@@ -1138,12 +1748,12 @@ func renderHTMLPage(c *gin.Context, settingSvc setting.SettingService, articleSv
 		"favicon":         settingSvc.Get(constant.KeyIconURL.String()),
 		// --- 用于 Vue 水合的数据 ---
 		"initialData":   nil,
-		"ogType":        "website",
+		"ogType":        ogType,
 		"ogUrl":         fullURL,
 		"ogTitle":       defaultTitle,
 		"ogDescription": defaultDescription,
 		"ogImage":       defaultImage,
-		"ogSiteName":    settingSvc.Get(constant.KeyAppName.String()),
+		"ogSiteName":    siteName,
 		"ogLocale":      "zh_CN",
 		// --- Article 元标签数据 (默认为空) ---
 		"articlePublishedTime": nil,
@@ -1158,4 +1768,245 @@ func renderHTMLPage(c *gin.Context, settingSvc setting.SettingService, articleSv
 		"customHeaderHTML": template.HTML(customHeaderHTML),
 		"customFooterHTML": template.HTML(customFooterHTML),
 	}))
+}
+
+// getPageHTMLPath 根据请求路径获取对应的 HTML 文件路径
+// 支持多页面模式，每个路由可以有独立的 HTML 文件
+func getPageHTMLPath(requestPath string) string {
+	// 移除末尾斜杠
+	requestPath = strings.TrimSuffix(requestPath, "/")
+
+	// 根路径返回 index.html
+	if requestPath == "" || requestPath == "/" {
+		return "index.html"
+	}
+
+	// 移除开头斜杠
+	requestPath = strings.TrimPrefix(requestPath, "/")
+
+	// 检查是否是文章详情页 /posts/{slug}
+	if strings.HasPrefix(requestPath, "posts/") && strings.Count(requestPath, "/") == 1 {
+		// 文章详情页使用模板文件
+		return "posts/__template__.html"
+	}
+
+	// 其他页面直接映射到 HTML 文件
+	// 例如 /about -> about.html, /categories -> categories.html
+	return requestPath + ".html"
+}
+
+// isGoTemplateHTML 检查 HTML 内容是否是 Go 模板格式
+// 通过检测 Go 模板特有的语法来区分：
+//   - {{.xxx}} - 变量引用
+//   - {{if ...}} - 条件语句
+//   - {{range ...}} - 循环语句
+//   - {{template ...}} - 模板引用
+//
+// 简单的 {{ 可能出现在 JavaScript 代码中，不能作为判断依据
+func isGoTemplateHTML(content string) bool {
+	// Go 模板变量语法：{{.xxx}} 或 {{ .xxx }}
+	goTemplateVarPattern := regexp.MustCompile(`\{\{\s*\.`)
+	// Go 模板控制语法：{{if, {{range, {{template, {{define, {{block, {{with, {{end
+	goTemplateCtrlPattern := regexp.MustCompile(`\{\{\s*(if|range|template|define|block|with|end|else)\b`)
+
+	return goTemplateVarPattern.MatchString(content) || goTemplateCtrlPattern.MatchString(content)
+}
+
+// serveStaticHTMLFile 提供静态 HTML 文件，并支持模板变量注入
+// 用于多页面模式，为每个页面提供独立的预渲染 HTML
+// 支持两种类型：
+//   - Go 模板：包含 {{.xxx}} 等模板语法，会注入数据后渲染
+//   - 纯静态 HTML：直接返回，适用于 Next.js 等现代前端框架
+func serveStaticHTMLFile(c *gin.Context, filePath string, settingSvc setting.SettingService, articleSvc article_service.Service, funcMap template.FuncMap) {
+	// 读取 HTML 文件
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		debugLog("读取HTML文件失败: %s, 错误: %v", filePath, err)
+		c.Status(http.StatusNotFound)
+		return
+	}
+
+	htmlContent := string(content)
+
+	// 检查是否是 Go 模板文件（包含 Go 模板特有语法）
+	// 注意：简单的 {{ 可能出现在 JS 代码中，需要更精确的判断
+	isGoTemplate := isGoTemplateHTML(htmlContent)
+
+	if isGoTemplate {
+		// 解析为 Go 模板并渲染
+		tmpl, err := template.New(filepath.Base(filePath)).Funcs(funcMap).Parse(htmlContent)
+		if err != nil {
+			debugLog("解析HTML模板失败: %s, 错误: %v", filePath, err)
+			// 如果解析失败，直接返回原始内容
+			c.Header("Content-Type", "text/html; charset=utf-8")
+			c.String(http.StatusOK, htmlContent)
+			return
+		}
+
+		// 准备模板数据
+		fullURL := getCanonicalURL(c, settingSvc)
+		siteName := settingSvc.Get(constant.KeyAppName.String())
+		subTitle := settingSvc.Get(constant.KeySubTitle.String())
+		defaultTitle := fmt.Sprintf("%s - %s", siteName, subTitle)
+		defaultDescription := settingSvc.Get(constant.KeySiteDescription.String())
+		defaultImage := settingSvc.Get(constant.KeyLogoURL512.String())
+		ogType := "website"
+
+		// 🆕 尝试获取页面特定的 SEO 数据
+		pageSEO := getPageSEOData(c.Request.Context(), c.Request.URL.Path, settingSvc)
+		if pageSEO != nil {
+			defaultTitle = fmt.Sprintf("%s - %s", pageSEO.Title, siteName)
+			if pageSEO.Description != "" {
+				defaultDescription = pageSEO.Description
+			}
+			if pageSEO.OgType != "" {
+				ogType = pageSEO.OgType
+			}
+			debugLog("🎯 serveStaticHTMLFile SEO 优化: path=%s, title=%s", c.Request.URL.Path, defaultTitle)
+		}
+
+		customHeaderHTML := ensureScriptTagsClosed(settingSvc.Get(constant.KeyCustomHeaderHTML.String()))
+		customFooterHTML := ensureScriptTagsClosed(settingSvc.Get(constant.KeyCustomFooterHTML.String()))
+
+		baseURL := settingSvc.Get(constant.KeySiteURL.String())
+		breadcrumbList := generateBreadcrumbList(c.Request.URL.Path, baseURL, settingSvc)
+		socialMediaLinks := generateSocialMediaLinks(settingSvc)
+
+		// 默认数据
+		data := gin.H{
+			"pageTitle":            defaultTitle,
+			"pageDescription":      defaultDescription,
+			"keywords":             settingSvc.Get(constant.KeySiteKeywords.String()),
+			"author":               settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String()),
+			"themeColor":           "#f7f9fe",
+			"favicon":              settingSvc.Get(constant.KeyIconURL.String()),
+			"initialData":          nil,
+			"ogType":               ogType,
+			"ogUrl":                fullURL,
+			"ogTitle":              defaultTitle,
+			"ogDescription":        defaultDescription,
+			"ogImage":              defaultImage,
+			"ogSiteName":           siteName,
+			"ogLocale":             "zh_CN",
+			"articlePublishedTime": nil,
+			"articleModifiedTime":  nil,
+			"articleAuthor":        nil,
+			"articleTags":          nil,
+			"breadcrumbList":       breadcrumbList,
+			"socialMediaLinks":     socialMediaLinks,
+			"customHeaderHTML":     template.HTML(customHeaderHTML),
+			"customFooterHTML":     template.HTML(customFooterHTML),
+		}
+
+		// 🆕 检测是否是文章详情页，获取文章数据
+		isPostDetail, _ := regexp.MatchString(`^/posts/([^/]+)$`, c.Request.URL.Path)
+		if isPostDetail && articleSvc != nil {
+			slug := strings.TrimPrefix(c.Request.URL.Path, "/posts/")
+			debugLog("serveStaticHTMLFile: 检测到文章详情页，获取文章数据: %s", slug)
+			articleResponse, err := articleSvc.GetPublicBySlugOrID(c.Request.Context(), slug)
+			if err != nil {
+				debugLog("serveStaticHTMLFile: 获取文章失败: %s, 错误: %v", slug, err)
+			} else if articleResponse != nil {
+				// 更新 SEO 数据
+				pageTitle := fmt.Sprintf("%s - %s", articleResponse.Title, settingSvc.Get(constant.KeyAppName.String()))
+				var pageDescription string
+				if len(articleResponse.Summaries) > 0 && articleResponse.Summaries[0] != "" {
+					pageDescription = articleResponse.Summaries[0]
+				} else {
+					plainText := parser.StripHTML(articleResponse.ContentHTML)
+					plainText = strings.Join(strings.Fields(plainText), " ")
+					pageDescription = strutil.Truncate(plainText, 150)
+				}
+				if pageDescription == "" {
+					pageDescription = defaultDescription
+				}
+
+				// 构建文章标签列表
+				articleTags := make([]string, len(articleResponse.PostTags))
+				for i, tag := range articleResponse.PostTags {
+					articleTags[i] = tag.Name
+				}
+
+				// 转换图片为懒加载
+				articleResponse.ContentHTML = convertImagesToLazyLoad(articleResponse.ContentHTML)
+
+				// 创建包含时间戳的初始数据
+				initialDataWithTimestamp := map[string]interface{}{
+					"data":          articleResponse,
+					"__timestamp__": time.Now().UnixMilli(),
+				}
+
+				// 确定 keywords
+				keywords := articleResponse.Keywords
+				if keywords == "" {
+					keywords = settingSvc.Get(constant.KeySiteKeywords.String())
+				}
+
+				// 更新数据
+				data["pageTitle"] = pageTitle
+				data["pageDescription"] = pageDescription
+				data["keywords"] = keywords
+				data["themeColor"] = articleResponse.PrimaryColor
+				data["initialData"] = initialDataWithTimestamp
+				data["ogType"] = "article"
+				data["ogTitle"] = pageTitle
+				data["ogDescription"] = pageDescription
+				data["ogImage"] = articleResponse.CoverURL
+				data["articlePublishedTime"] = articleResponse.CreatedAt
+				data["articleModifiedTime"] = articleResponse.UpdatedAt
+				data["articleAuthor"] = settingSvc.Get(constant.KeyFrontDeskSiteOwnerName.String())
+				data["articleTags"] = articleTags
+
+				// 🆕 添加文章详情页需要的更多数据（用于 Go 模板直接渲染）
+				data["articleCover"] = articleResponse.CoverURL
+				data["articleContent"] = template.HTML(articleResponse.ContentHTML) // 允许 HTML 渲染
+				data["articleReadingTime"] = articleResponse.ReadingTime
+				data["articleViewCount"] = articleResponse.ViewCount
+				data["articleWordCount"] = articleResponse.WordCount
+				data["articleTagsList"] = articleTags
+				data["articlePrimaryColor"] = articleResponse.PrimaryColor
+				data["currentYear"] = time.Now().Year()
+
+				// 文章分类
+				if len(articleResponse.PostCategories) > 0 {
+					data["articleCategory"] = articleResponse.PostCategories[0].Name
+				}
+
+				// 上一篇/下一篇文章
+				if articleResponse.PrevArticle != nil {
+					data["prevArticle"] = map[string]interface{}{
+						"slug":  articleResponse.PrevArticle.Abbrlink,
+						"title": articleResponse.PrevArticle.Title,
+					}
+				}
+				if articleResponse.NextArticle != nil {
+					data["nextArticle"] = map[string]interface{}{
+						"slug":  articleResponse.NextArticle.Abbrlink,
+						"title": articleResponse.NextArticle.Title,
+					}
+				}
+
+				debugLog("serveStaticHTMLFile: 文章数据已注入: %s", articleResponse.Title)
+			}
+		}
+
+		// 设置响应头
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+
+		// 渲染模板
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, data); err != nil {
+			debugLog("渲染HTML模板失败: %s, 错误: %v", filePath, err)
+			c.String(http.StatusInternalServerError, "渲染页面失败")
+			return
+		}
+
+		c.String(http.StatusOK, buf.String())
+	} else {
+		// 非模板文件，直接返回
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.Header("Cache-Control", "public, max-age=3600") // 静态 HTML 可以缓存
+		c.String(http.StatusOK, htmlContent)
+	}
 }

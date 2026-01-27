@@ -51,6 +51,7 @@ type ExportArticleItem struct {
 
 	// 版权信息
 	Copyright           bool   `json:"copyright"`
+	IsReprint           bool   `json:"is_reprint"`
 	CopyrightAuthor     string `json:"copyright_author,omitempty"`
 	CopyrightAuthorHref string `json:"copyright_author_href,omitempty"`
 	CopyrightURL        string `json:"copyright_url,omitempty"`
@@ -141,6 +142,7 @@ func (s *serviceImpl) ExportArticles(ctx context.Context, articleIDs []string) (
 			HomeSort:             article.HomeSort,
 			PinSort:              article.PinSort,
 			Copyright:            article.Copyright,
+			IsReprint:            article.IsReprint,
 			CopyrightAuthor:      article.CopyrightAuthor,
 			CopyrightAuthorHref:  article.CopyrightAuthorHref,
 			CopyrightURL:         article.CopyrightURL,
@@ -407,6 +409,7 @@ func (s *serviceImpl) ImportArticles(ctx context.Context, req *ImportArticleRequ
 			PinSort:              articleData.PinSort,
 			TopImgURL:            articleData.TopImgURL,
 			Copyright:            &articleData.Copyright,
+			IsReprint:            &articleData.IsReprint,
 			CopyrightAuthor:      articleData.CopyrightAuthor,
 			CopyrightAuthorHref:  articleData.CopyrightAuthorHref,
 			CopyrightURL:         articleData.CopyrightURL,

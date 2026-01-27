@@ -46,6 +46,7 @@ type Article struct {
 	Summaries            []string
 	Abbrlink             string
 	Copyright            bool
+	IsReprint            bool
 	CopyrightAuthor      string
 	CopyrightAuthorHref  string
 	CopyrightURL         string
@@ -96,6 +97,7 @@ type CreateArticleRequest struct {
 	IsPrimaryColorManual *bool               `json:"is_primary_color_manual"`
 	Abbrlink             string              `json:"abbrlink,omitempty"`
 	Copyright            *bool               `json:"copyright,omitempty"`
+	IsReprint            *bool               `json:"is_reprint,omitempty"`
 	CopyrightAuthor      string              `json:"copyright_author,omitempty"`
 	CopyrightAuthorHref  string              `json:"copyright_author_href,omitempty"`
 	CopyrightURL         string              `json:"copyright_url,omitempty"`
@@ -132,6 +134,7 @@ type UpdateArticleRequest struct {
 	IsPrimaryColorManual *bool               `json:"is_primary_color_manual"`
 	Abbrlink             *string             `json:"abbrlink"`
 	Copyright            *bool               `json:"copyright"`
+	IsReprint            *bool               `json:"is_reprint"`
 	CopyrightAuthor      *string             `json:"copyright_author"`
 	CopyrightAuthorHref  *string             `json:"copyright_author_href"`
 	CopyrightURL         *string             `json:"copyright_url"`
@@ -174,6 +177,7 @@ type ArticleResponse struct {
 	Summaries            []string                `json:"summaries"`
 	Abbrlink             string                  `json:"abbrlink"`
 	Copyright            bool                    `json:"copyright"`
+	IsReprint            bool                    `json:"is_reprint"`
 	CopyrightAuthor      string                  `json:"copyright_author"`
 	CopyrightAuthorHref  string                  `json:"copyright_author_href"`
 	CopyrightURL         string                  `json:"copyright_url"`
@@ -246,6 +250,7 @@ type ListPublicArticlesOptions struct {
 	TagName      string `json:"tagName"`
 	Year         int    `json:"year"`
 	Month        int    `json:"month"`
+	WithContent  bool   // 是否包含 ContentMd 字段（用于知识库同步等场景）
 }
 
 type SiteStats struct {
@@ -322,6 +327,7 @@ type CreateArticleParams struct {
 	Summaries            []string
 	Abbrlink             string
 	Copyright            bool
+	IsReprint            bool
 	CopyrightAuthor      string
 	CopyrightAuthorHref  string
 	CopyrightURL         string
